@@ -2,6 +2,18 @@
 
 # Project ideas
 
+## Contents
+1. [Inverse Toon Shading](#inverse-toon-shading)
+2. [Navigating Intrinsic Triangulations](#navigating-intrinsic-triangulations)
+3. [NPR-related stuff- shaders, outline detection](#npr-related-stuff--shaders-outline-detection)
+4. [Light Exposure Visualisation Tool (?) for Maya](#light-exposure-visualisation-tool--for-maya)
+5. [Seamless Parametrization in Penner Coordinates](#seamless-parametrization-in-penner-coordinates)
+6. [Adjoint Nonlinear Ray Tracing](#adjoint-nonlinear-ray-tracing)
+7. [Stylizing Ribbons: Computing Surface Contours with Temporally Coherent Orientations](#stylizing-ribbons-computing-surface-contours-with-temporally-coherent-orientations)
+8. [Surface Simplification Using Quadric Error Metrics](#surface-simplification-using-quadric-error-metrics)
+9. [Garment Refitting for Digital Characters](#garment-refitting-for-digital-characters)
+10. [Hair Simulation](#hair-simulation)
+
 ## Inverse Toon Shading
 
 \[Paper found [here](./References/InverseToonShading/Inverse%20Toon%20Shading-%20Interactive%20Normal%20Field%20Modeling%20with%20Isophotes.pdf)]
@@ -41,6 +53,8 @@ The above is for simple toons. For complex toons e.g.
     - flat sections: keep the 3D normal constant
 
 The authors of this paper created a tool for artists to specify the isophotes. Their demo can be seen [here](https://youtu.be/ltlILoMVQ6A?si=IPn3YaL5knYken8o&t=149)
+
+[Back to contents](#contents)
 
 ## Navigating Intrinsic Triangulations
 
@@ -100,6 +114,8 @@ The authors of this paper created a tool for artists to specify the isophotes. T
     - Adaptive Mesh Refinement
     - Tangent Vector Field Processing
 
+[Back to contents](#contents)
+
 ## NPR-related stuff- shaders, outline detection
 
 Implementing a cross hatch/halftone dot shader would be cool. I'm still looking into this but I've collated some resources so far below.
@@ -119,6 +135,8 @@ Cool reference using WebGL (.js) [here](https://spite.github.io/sketch/)
 
 Book [Non-Photorealistic Rendering](https://www.google.co.uk/books/edition/Non_Photorealistic_Rendering/AWG1DwAAQBAJ?hl=en&gbpv=1&printsec=frontcover) by Bruce Gooch and Amy Gooch
 
+[Back to contents](#contents)
+
 ## Light Exposure Visualisation Tool (?) for Maya
 
 Toying with the idea of trying to help animators visually assess the need for more focus on regions that are more well-lit and vice-versa. Might be too ambitious for the ASE project but perhaps some small part of this?
@@ -126,6 +144,8 @@ Toying with the idea of trying to help animators visually assess the need for mo
 Idea is roughly while animating, seeing the light gradient can help animators place characters effectively within the light to ensure they’re visible and properly oriented for the camera. This tool would give them immediate visual feedback on the light exposure of specific areas, allowing them to avoid issues like having characters unintentionally in shadow.
 
 So instead of a full light rendering, there is a frame-by-frame light exposure visualization tool that can be cached based on camera movement. The tool can be toggled on and off as needed. Green regions are the most lit while red is in darkness. There is a gradient of shades in between. Not sure if something like that has been done before, if it would be useful in a typical offline-rendering pipelines, if lights are even in place before it reaches the animators and so on. Need to investigate this further if it's worth doing.
+
+[Back to contents](#contents)
 
 ## Seamless Parametrization in Penner Coordinates
 
@@ -135,6 +155,8 @@ So instead of a full light rendering, there is a frame-by-frame light exposure v
 
 ### (to update)
 
+[Back to contents](#contents)
+
 ## Adjoint Nonlinear Ray Tracing
 \[Paper found [here](./References/Adjoint%20Nonlinear%20Ray%20Tracing.pdf)\]
 
@@ -143,6 +165,8 @@ So instead of a full light rendering, there is a frame-by-frame light exposure v
 * use adjoint state method to derive a set of equations for computing derivatives wrt the refractive index field of optimizing objectives that are subject to nonlinear ray tracing constraints
 * intro discretization schemes to numerically evaluate the eqns
 ### (to update)
+
+[Back to contents](#contents)
 
 ## Stylizing Ribbons: Computing Surface Contours with Temporally Coherent Orientations
 
@@ -158,6 +182,8 @@ So instead of a full light rendering, there is a frame-by-frame light exposure v
 
 * Pseudo-code\
 ![image](./References/StylizingRibbons/StylizingRibbons-Algo1.png)
+
+[Back to contents](#contents)
 
 ## Surface Simplification Using Quadric Error Metrics
 
@@ -243,6 +269,8 @@ def SimplifyModel(_model):
 
 ```
 
+[Back to contents](#contents)
+
 ## Garment Refitting for Digital Characters
 
 \[Paper found [here](./References/Garment%20Refitting%20for%20Digital%20Characters.pdf)\]
@@ -253,8 +281,12 @@ def SimplifyModel(_model):
     * **rebinding**: reset spacing between the refitted garment and the character body controlled by **tightness values**
 * Method also supports additional constraints that encode the spatial and structural arrangement of **multi-layers, seams and fold-overs**
 
+[Back to contents](#contents)
+
 ## Hair Simulation
 
 \[SIGGRAPH Course Notes [here](https://developer.download.nvidia.com/presentations/2010/SIGGRAPH/HairCourse_SIGGRAPH2010.pdf)\]
 
 ### to update?
+
+[Back to contents](#contents)
