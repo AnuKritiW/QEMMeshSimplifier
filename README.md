@@ -100,6 +100,33 @@ The authors of this paper created a tool for artists to specify the isophotes. T
     - Adaptive Mesh Refinement
     - Tangent Vector Field Processing
 
+## NPR-related stuff- shaders, outline detection
+
+Implementing a cross hatch/halftone dot shader would be cool. I'm still looking into this but I've collated some resources so far below.
+
+\[Paper on [Interactive Pen-and-Ink Illustration](./References/Interactive%20Pen-and-Ink%20Illustration.pdf)\]
+- some reference for textures and methods like hatching, cross-hatching, stippling
+
+\[Paper on [Real-Time Hatching](./References/Real-Time%20Hatching.pdf)]
+- Uses concept of tonal art maps (TAM)
+- General and can be used to represent a variety of aesthetics (e.g. pencil, crayon, stippling, and charcoal).
+- I think this assumes you have an input of a scene already, and works off of the intensity in the input image to assign a hatch sample to
+    - need to read in more detail
+
+Cool reference using WebGL (.js) [here](https://spite.github.io/sketch/)
+
+\[Paper on [Suggestive Contours for Conveying Shape](./References/Suggestive%20Contours%20for%20Conveying%20Shape.pdf)]
+
+Book [Non-Photorealistic Rendering](https://www.google.co.uk/books/edition/Non_Photorealistic_Rendering/AWG1DwAAQBAJ?hl=en&gbpv=1&printsec=frontcover) by Bruce Gooch and Amy Gooch
+
+## Light Exposure Visualisation Tool (?) for Maya
+
+Toying with the idea of trying to help animators visually assess the need for more focus on regions that are more well-lit and vice-versa. Might be too ambitious for the ASE project but perhaps some small part of this?
+
+Idea is roughly while animating, seeing the light gradient can help animators place characters effectively within the light to ensure they’re visible and properly oriented for the camera. This tool would give them immediate visual feedback on the light exposure of specific areas, allowing them to avoid issues like having characters unintentionally in shadow.
+
+So instead of a full light rendering, there is a frame-by-frame light exposure visualization tool that can be cached based on camera movement. The tool can be toggled on and off as needed. Green regions are the most lit while red is in darkness. There is a gradient of shades in between. Not sure if something like that has been done before, if it would be useful in a typical offline-rendering pipelines, if lights are even in place before it reaches the animators and so on. Need to investigate this further if it's worth doing.
+
 ## Seamless Parametrization in Penner Coordinates
 
 \[Paper found [here](./References/Seamless%20Parametrization%20in%20Penner%20Coordinates.pdf)\]
