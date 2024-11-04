@@ -2,6 +2,46 @@
 
 # Project ideas
 
+## Inverse Toon Shading
+
+\[Paper found [here](./References/InverseToonShading/Inverse%20Toon%20Shading-%20Interactive%20Normal%20Field%20Modeling%20with%20Isophotes.pdf)]
+
+* Inverse Toon shading is the transformation of a discrete or toon-shaded image into a smooth 3D normal field that matches the discrete shading.
+* Create plausible normal fields with user input of a 2D silhouette of a smooth object + toon-shadings of the interior
+* Each toon shading is interpreted as a set of _isophate curves_ sharing the same light direction.
+    * artists pick light directions and draw isophate shapes, where the 2D isophate is indicative of its 3D shape
+    * 3D surface normals change smoothly along the isophates with minimal variation.
+
+<img src="./References/InverseToonShading/overview.png" width="700" />
+
+- An _isophote_ is the line that demarcates the boundaries between discrete toon shaded regions
+- The intersection of the _isophote_ and the silhouette (the outline of the overall toon in 3D) indicates the light direction
+    - The normal vectors at these intersections along with the isophote's luminance value specify the light direction in 3D
+        - all 3D surface normals along the isophote  must lie on a cone of vectors around the light direction
+
+<img src="./References/InverseToonShading/intersection.png" width="350" />
+
+- Can interpolate between the two known 3D normals at the silhouette to get the surface
+    - a series of operations here.
+    1. linearly interpolate around the light cone as a function of 2D arc length.
+    2. the 3D normals along the isophote are used to compute the 3D tangent vectors
+    3. 3D tangent vectors used to iteratively re interpolate 3D normals as a function of 3D isophote arc length
+    4. 3D normals along silhouettes and isophotes are diffused into the interior of the shape
+
+<img src="./References/InverseToonShading/interpolation.png" width="250" />
+<img src="./References/InverseToonShading/shape.png" width="263" />
+
+The above is for simple toons. For complex toons e.g.
+
+<img src="./References/InverseToonShading/complex.png" width="350" />
+
+- expect the projected 2D curve to be indicative of the 3D shape
+- because inflection points are preserved when projecting from 3D to 2D, can break the 2D isophotes into convex, concave and flat sections as in the image above
+    - concave sections: reverse interpolation direction around the light cone
+    - flat sections: keep the 3D normal constant
+
+The authors of this paper created a tool for artists to specify the isophotes. Their demo can be seen [here](https://youtu.be/ltlILoMVQ6A?si=IPn3YaL5knYken8o&t=149)
+
 ## Navigating Intrinsic Triangulations
 
 \[Paper found [here](./References/NavigatingIntrinsicTriangulations/Navigating%20Intrinsic%20Triangulations.pdf); project page found [here](http://www.cs.cmu.edu/~kmcrane/Projects/NavigatingIntrinsicTriangulations/index.html)\]
@@ -9,10 +49,10 @@
 * Present a **signpost data structure** that makes it easy to run computational geometry algorithms on **poor-quality surface meshes** (e.g. meshes with skinny triangles)
 * Operates as a black-box -- eliminating need to change the geometry for processing
 * Method considers **intrinsic triangulation** which connect vertices by straight paths along the exact geometry of the input mesh
-* **Signpost data structure** stores the direction and distance to each neighbouring vertex.\
+* **Signpost data structure** stores the direction and distance to each neighbouring vertex.
 
 <img src="./References/NavigatingIntrinsicTriangulations/Signpost.png" width="350" />
-<img src="./References/NavigatingIntrinsicTriangulations/signpost_intrinsic_triangulation.jpg" width="450" />\
+<img src="./References/NavigatingIntrinsicTriangulations/signpost_intrinsic_triangulation.jpg" width="450" />
 
 <img src="./References/NavigatingIntrinsicTriangulations/InitSignpostMesh_Algo4.png" width="550" />
 
