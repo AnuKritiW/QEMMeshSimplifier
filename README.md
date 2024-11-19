@@ -5,9 +5,6 @@
 ## Contents
 1. [Surface Simplification Using Quadric Error Metrics](#surface-simplification-using-quadric-error-metrics)
 2. [Navigating Intrinsic Triangulations](#navigating-intrinsic-triangulations)
-3. [Stylizing Ribbons: Computing Surface Contours with Temporally Coherent Orientations](#stylizing-ribbons-computing-surface-contours-with-temporally-coherent-orientations)
-4. [Inverse Toon Shading](#inverse-toon-shading)
-5. [NPR-related stuff- shaders, outline detection](#npr-related-stuff--shaders-outline-detection)
 
 ## Surface Simplification Using Quadric Error Metrics
 
@@ -152,85 +149,5 @@ def SimplifyModel(_model):
     - Geodesic Distance
     - Adaptive Mesh Refinement
     - Tangent Vector Field Processing
-
-[Back to contents](#contents)
-
-## Stylizing Ribbons: Computing Surface Contours with Temporally Coherent Orientations
-
-\[Paper found [here](./References/StylizingRibbons/Stylizing%20Ribbons-%20Computing%20Surface%20Contours%20with%20Temporally%20Coherent%20Orientations.pdf)\]
-
-* To do with line work in stylized animation (e.g. Spider-verse, Soul, etc.)
-* Offers artists direct control over the inside and outside of surface contours.
-* Method creates _ribbons_, geometry strips that extrude from each side of the surface contour with temporally coherent orientations.
-    * Generation of spatially and temporally consistent normal orientations along visible contours\
-    ![image](./References/StylizingRibbons/StylizingRibbons-Fig1.png)
-    * trimming routine that converts arrangements of offset curves into ribbons free of intersections\
-    ![image](./References/StylizingRibbons/StylizingRibbons-Fig2.png)
-
-* Pseudo-code\
-![image](./References/StylizingRibbons/StylizingRibbons-Algo1.png)
-
-[Back to contents](#contents)
-
-## Inverse Toon Shading
-
-\[Paper found [here](./References/InverseToonShading/Inverse%20Toon%20Shading-%20Interactive%20Normal%20Field%20Modeling%20with%20Isophotes.pdf)]
-
-* Inverse Toon shading is the transformation of a discrete or toon-shaded image into a smooth 3D normal field that matches the discrete shading.
-* Create plausible normal fields with user input of a 2D silhouette of a smooth object + toon-shadings of the interior
-* Each toon shading is interpreted as a set of _isophate curves_ sharing the same light direction.
-    * artists pick light directions and draw isophate shapes, where the 2D isophate is indicative of its 3D shape
-    * 3D surface normals change smoothly along the isophates with minimal variation.
-
-<img src="./References/InverseToonShading/overview.png" width="700" />
-
-- An _isophote_ is the line that demarcates the boundaries between discrete toon shaded regions
-- The intersection of the _isophote_ and the silhouette (the outline of the overall toon in 3D) indicates the light direction
-    - The normal vectors at these intersections along with the isophote's luminance value specify the light direction in 3D
-        - all 3D surface normals along the isophote  must lie on a cone of vectors around the light direction
-
-<img src="./References/InverseToonShading/intersection.png" width="350" />
-
-- Can interpolate between the two known 3D normals at the silhouette to get the surface
-    - a series of operations here.
-    1. linearly interpolate around the light cone as a function of 2D arc length.
-    2. the 3D normals along the isophote are used to compute the 3D tangent vectors
-    3. 3D tangent vectors used to iteratively re interpolate 3D normals as a function of 3D isophote arc length
-    4. 3D normals along silhouettes and isophotes are diffused into the interior of the shape
-
-<img src="./References/InverseToonShading/interpolation.png" width="250" />
-<img src="./References/InverseToonShading/shape.png" width="263" />
-
-The above is for simple toons. For complex toons e.g.
-
-<img src="./References/InverseToonShading/complex.png" width="350" />
-
-- expect the projected 2D curve to be indicative of the 3D shape
-- because inflection points are preserved when projecting from 3D to 2D, can break the 2D isophotes into convex, concave and flat sections as in the image above
-    - concave sections: reverse interpolation direction around the light cone
-    - flat sections: keep the 3D normal constant
-
-The authors of this paper created a tool for artists to specify the isophotes. Their demo can be seen [here](https://youtu.be/ltlILoMVQ6A?si=IPn3YaL5knYken8o&t=149)
-
-[Back to contents](#contents)
-
-## NPR-related stuff- shaders, outline detection
-
-Implementing a cross hatch/halftone dot shader would be cool. I'm still looking into this but I've collated some resources so far below.
-
-\[Paper on [Interactive Pen-and-Ink Illustration](./References/NPR/Interactive%20Pen-and-Ink%20Illustration.pdf)\]
-- some reference for textures and methods like hatching, cross-hatching, stippling
-
-\[Paper on [Real-Time Hatching](./References/NPR/Real-Time%20Hatching.pdf)]
-- Uses concept of tonal art maps (TAM)
-- General and can be used to represent a variety of aesthetics (e.g. pencil, crayon, stippling, and charcoal).
-- I think this assumes you have an input of a scene already, and works off of the intensity in the input image to assign a hatch sample to
-    - need to read in more detail
-
-Cool reference using WebGL (.js) [here](https://spite.github.io/sketch/)
-
-\[Paper on [Suggestive Contours for Conveying Shape](./References/NPR/Suggestive%20Contours%20for%20Conveying%20Shape.pdf)]
-
-Book [Non-Photorealistic Rendering](https://www.google.co.uk/books/edition/Non_Photorealistic_Rendering/AWG1DwAAQBAJ?hl=en&gbpv=1&printsec=frontcover) by Bruce Gooch and Amy Gooch
 
 [Back to contents](#contents)
