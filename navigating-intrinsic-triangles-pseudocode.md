@@ -157,13 +157,13 @@ double GetEdgeLen(HalfEdge* _edge)
 ### algorithm1: UpdateSignpost
 ```c++
 // Updates the direction of each edge from the intrinsic vertex using cumulative angles from a single point of reference
-void UpdateSignpost(Signpost& _S, HalfEdge* _e_ij) // _e1 is ij
+void UpdateSignpost(Signpost& _S, HalfEdge* _e_ij)
 {
     HalfEdge* e_jk = _e_ij->next;
     HalfEdge* e_ki = _e_ij->next->next;
 
     double curr_angle = ComputeAngle(_e_ij, e_jk, e_ki); // θ_i^jk
-    double cumulative_angle = _S.getCumulativeAngle(_e_ij) + (((2 * M_PI) * curr_angle) / (S.getTotalAngle(_e_ij->vertex)))
+    double cumulative_angle = _S.getCumulativeAngle(_e_ij) + (((2 * M_PI) * curr_angle) / (S.getTotalAngle(_e_ij->vertex)));
 
     _S.setCumulativeAngle(_e_ki->twin, cumulative_angle);
 }
@@ -173,10 +173,40 @@ void UpdateSignpost(Signpost& _S, HalfEdge* _e_ij) // _e1 is ij
 ```c++
 // input is 'A tangent vector at vertex i specified via a magnitude r and an angle [0, 2pi)]
 // Output is a extrinsic triangle xyz and a point in barycentric coords --> reconsider return type
-Halfedge* TraceFromVertex(Signpost& _S, unsigned int _vertIdx, double _magnitude, double _angle)
+std::pair<Face*, Vector3> TraceFromVertex(Signpost& _S, unsigned int _vertIdx, double _magnitude, double _angle)
 {
-    // Input Validation
+    // TODO: Input Validation
 
+    Vertex* startVert = &_S.M.vertices[_vertIdx];
+    HalfEdge* startEdge = startVert->outgoingHalfEdge;
+    HalfEdge* currEdge = startEdge;
+
+    double accumulatedAngle = 0.0;
+
+    // TODO: check why the pseudocode in the paper makes use of the total angle
+    do
+    {
+        // TODO: Add nullptr check
+
+        const double currAccumulatedAngle = _S.getCumulativeAngle(currEdge);
+        if (currAccumulatedAngle > _angle)
+        {
+            break; // The target point is in the current triangle
+        }
+
+        accumulatedAngle = currAccumulativeAngle;
+        currEdge = currEdge->next->next->twin;
+    } while (currEdge != startEdge)
+
+    const double remainingAngle = _angle - accumulatedAngle;
+
+    Vector3 p = ComputeBarycentricCoords(currEdge, _magnitude, remainingAngle);
+
+    return {currEdge->face, p};
+}
+
+Vector3 ComputeBarycentricCoords(HalfEdge* _eij, double _magnitude, double _angle)
+{
     // TODO: fill in
 }
 ```
