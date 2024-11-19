@@ -1,12 +1,13 @@
-## Pseudocode
+Trying to understand the paper and the pseudocodes provided
 
 ```c++
 
 struct Signpost {
     TriangleMesh M;
     std::vector<double> edgeLengths;
-    std::vector<double> angles;
-    std::vector<double> totalAngles;
+    std::unordered_map<Halfedge*, double> cumulativeAnglesMap;
+    std::vector<Vector3> barycentricCoordinates; // Stores (b1, b2, b3) for intrinsic vertices
+    std::unordered_map<Vertex&, double> totalAngles;
 
     void setMesh(TriangleMesh _M)
     {
@@ -18,9 +19,24 @@ struct Signpost {
         edgeLengths.resize(_size, 0.0);
     }
 
-    void resizeTotalAnglesVec(unsigned int _size)
+    double getCumulativeAngle(HalfEdge* _e)
     {
-        totalAngles.resize(_size, 0.0);
+        return cumulativeAnglesMap[_e];
+    }
+
+    void setCumulativeAngle(HalfEdge* _e, double _angle)
+    {
+        cumulativeAnglesMap[_e] = _angle;
+    }
+
+    double getTotalAngle(Vertex& _v)
+    {
+        return totalAngles[_v];
+    }
+
+    void incrementTotalAngle(Vertex& _v, double _angle)
+    {
+        totalAngles[_v] += _angle;
     }
 }
 
@@ -59,7 +75,7 @@ struct HalfEdge
 }
 ```
 
-* algorithm4
+### algorithm4: InitSignpostMesh
 ```c++
 void InitSignpostMesh(TriangleMesh _M) // TODO: check why const std::vector<Vector3>& _vertexPositions is passed in the pseudocode
 {
@@ -67,7 +83,6 @@ void InitSignpostMesh(TriangleMesh _M) // TODO: check why const std::vector<Vect
     S.setMesh(_M);
     // Resize vectors for optimized access by id
     S.resizeEdgeLengthsVec(_M.edges.size());
-    S.resizeTotalAnglesVec(_M.vertices.size());
 
     for (size_t edgeIdx = 0; edgeIdx < _M.edges.size(); ++edgeIdx)
     {
@@ -78,7 +93,11 @@ void InitSignpostMesh(TriangleMesh _M) // TODO: check why const std::vector<Vect
     for (unsigned int vertIdx = 0; vertIdx < _M.vertices.size(); ++vertIdx)
     {
         const auto& vert = _M.vertices[vertIdx];
-        S.totalAngles[vertIdx] = 0.0;
+
+        // Initialize barycentric coordinates
+        S.barycentricCoordinates[vertIdx] = {1.0, 0.0, 0.0}; // Vertex is at itself
+
+        S.totalAngles[vert] = 0.0;
 
         HalfEdge* start = vertex.outgoingHalfEdge;
         HalfEdge* current = start;
@@ -87,27 +106,27 @@ void InitSignpostMesh(TriangleMesh _M) // TODO: check why const std::vector<Vect
         // checks for every degree of the vert
         do
         {
-            HalfEdge* e1 = current;              // ij
-            HalfEdge* e2 = current->next;        // jk
-            HalfEdge* e3 = current->next->next;  // ki
+            HalfEdge* e_ij = current;
+            HalfEdge* e_jk = current->next;
+            HalfEdge* e_ki = current->next->next;
 
             /** TODO: consider populating S.edgeLengths here instead.
                 * this may optimise on time but be suboptimal for memory as we would need to store a list of processed edges to ensure we only go over each edge once
             */
 
-            S.totalAngles[vertIdx] += ComputeAngle(e1, e2, e3);
+            S.incrementTotalAngle(vert, ComputeAngle(e_ij, e_jk, e_ki));
 
             // Move to the next triangle around the vertex
         current = current->twin->next;
-        }
-        while (current != start)
+        } while (current != start)
 
         // current is now start since we broke out of the previous while loop
-        do {
-            HalfEdge* e1 = current;               // ij
+        do
+        {
+            HalfEdge* e_ij = current;
 
-            // Call UpdateSignpost to comput
-            UpdateSignpost(S, e1);
+            // Call UpdateSignpost to compute
+            UpdateSignpost(S, e_ij);
 
             // Move to the next triangle
             current = current->twin->next;
@@ -115,13 +134,13 @@ void InitSignpostMesh(TriangleMesh _M) // TODO: check why const std::vector<Vect
     }
 }
 
-double ComputeAngle(HalfEdge* _e1, HalfEdge* _e2, HalfEdge* _e3)
+double ComputeAngle(HalfEdge* _e_ij, HalfEdge* _e_jk, HalfEdge* _e_ki)
 {
-    double e1Len = GetEdgeLen(_e1);
-    double e2Len = GetEdgeLen(_e2);
-    double e3Len = GetEdgeLen(_e3);
+    double e_ijLen = GetEdgeLen(_e_ij);
+    double e_jkLen = GetEdgeLen(_e_jk);
+    double e_kiLen = GetEdgeLen(_e_ki);
 
-    return std::acos(((std::pow(e1Len, 2)) + std::pow(e3Len, 2) -  std::pow(e2Len, 2)) / (2 * e1Len * e3Len));
+    return std::acos(((std::pow(e_ijLen, 2)) + std::pow(e_kiLen, 2) -  std::pow(e_jkLen, 2)) / (2 * e_ijLen * e_kiLen));
 }
 
 double GetEdgeLen(HalfEdge* _edge)
@@ -135,7 +154,22 @@ double GetEdgeLen(HalfEdge* _edge)
 
 ```
 
-* algorithm 2
+### algorithm1: UpdateSignpost
+```c++
+// Updates the direction of each edge from the intrinsic vertex using cumulative angles from a single point of reference
+void UpdateSignpost(Signpost& _S, HalfEdge* _e_ij) // _e1 is ij
+{
+    HalfEdge* e_jk = _e_ij->next;
+    HalfEdge* e_ki = _e_ij->next->next;
+
+    double curr_angle = ComputeAngle(_e_ij, e_jk, e_ki); // θ_i^jk
+    double cumulative_angle = _S.getCumulativeAngle(_e_ij) + (((2 * M_PI) * curr_angle) / (S.getTotalAngle(_e_ij->vertex)))
+
+    _S.setCumulativeAngle(_e_ki->twin, cumulative_angle);
+}
+```
+
+### algorithm2: TraceFromVertex
 ```c++
 // input is 'A tangent vector at vertex i specified via a magnitude r and an angle [0, 2pi)]
 // Output is a extrinsic triangle xyz and a point in barycentric coords --> reconsider return type
@@ -147,20 +181,7 @@ Halfedge* TraceFromVertex(Signpost& _S, unsigned int _vertIdx, double _magnitude
 }
 ```
 
-* algorithm 1
-```c++
-void UpdateSignpost(Signpost& _S, HalfEdge* _e1) // _e1 is ij
-{
-    HalfEdge* e2 = _e1->next;         // jk
-    HalfEdge* e3 = _e1->next->next;   // ki
-
-    double theta = ComputeAngle(e1, e2, e3);
-
-    // TODO: fill in updating _S
-}
-```
-
-* algorithm 3
+### algorithm3: UpdateVertex
 ```c++
 // input is a vertex i (reconsider input type)
 // Assumes all edge lengths of S are valid, and all angles in the link of vertex i are known
