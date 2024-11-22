@@ -29,6 +29,11 @@ struct Signpost {
         cumulativeAnglesMap[_e] = _angle;
     }
 
+    double getCumulativeAngle(HalfEdge* _e)
+    {
+        return cumulativeAnglesMap[_e];
+    }
+
     double getTotalAngle(Vertex& _v)
     {
         return totalAngles[_v];
@@ -216,8 +221,63 @@ Vector3 ComputeBarycentricCoords(HalfEdge* _eij, double _magnitude, double _angl
 // input is a vertex i (reconsider input type)
 // Assumes all edge lengths of S are valid, and all angles in the link of vertex i are known
 // output is an updated signpost mesh with valid angles for each edge incident on i
-void UpdateVertex(Signpost& _, int vertexIdx)
+
+/*
+for every degree edge from j0i to jni
+  update signpost for incoming angles --> i.e. the angle around the given j towards i
+
+then we need to get the extrinsic triangle and point from tracefromvertex. this is so that we get the reference direction from the extrinsic triangle (as explained in fig. 8)
+
+get the angle for i-j0 using this reference direction we found along the edge of the extrinsic triangle
+
+for every degree edge from ij1 to ijn,
+  update the outgoing angles
+*/
+
+void UpdateVertex(Signpost& _S, Vertex* _v)
 {
     // TODO: fill in
+    HalfEdge* startEdge = _v->outgoingHalfEdge; // i->j0
+    HalfEdge e_i_jn = startEdge;
+
+    do
+    {
+        HalfEdge* e_jn_i = e_i_jn->twin;
+        UpdateSignpost(S, e_jn_i);
+        e_i_jn = e_i_jn->next->next->twin; // TODO: check if this loop can be optimised in the way its getting edges
+    } while (e_i_jn != startEdge);
+
+    // e_i_jn == startEdge now that it's broken out of the loop --> i->j0
+
+    HalfEdge* e_j0_i = e_i_jn->twin;
+    Vertex* j0 = e_j0_i->vertex;
+    auto [extr_tri, p] = TraceFromVertex(_S, j0, GetEdgeLen(e_j0_i), _S.getCumulativeAngle(e_j0_i))
+
+    // Assume the reference edge of the triangle is xy
+    HalfEdge* refEdge = extr_tri->halfEdge; // First edge in the triangle (e_xy (?))
+    Vertex* v_x = refEdge->vertex;
+    Vertex* v_y = refEdge->next->vertex;
+    Vector3 refDir = (v_y->position - v_x->position).normalized(); // check if this should be a pair instead of vec3
+
+    Vector3 dir_i_j0 = (j0->position - _v->position).normalized(); // check if this should be a pair instead of vec3
+
+    // Argument(u, v) gives the angle from vec u to vec v in the range [0, 2pi)
+    _S.setCumulativeAngle(e_i_jn, Argument(refDir, dir_i_j0));
+
+    // e_i_jn == startEdge still as we did not update it
+
+    do
+    {
+        HalfEdge* prevEdge = e_i_jn;        // e_i_j_(n-1)
+        HalfEdge* oppEdge = prevEdge->next; // e__j_(n-1)_j_n
+        HalfEdge* e_jn_i = oppEdge->next;   // currEdge->twin
+        e_i_jn = e_jn_i->twin;              // currEdge
+
+        double currAngle = ComputeAngle(prevEdge, oppEdge, e_jn_i);  // θ_i^jn
+        double cumulativeAngle = _S.getCumulativeAngle(prevEdge) + currAngle;
+
+        _S.setCumulativeAngle(e_i_jn, cumulativeAngle);
+
+    } while (e_i_jn != startEdge);
 }
 ```
