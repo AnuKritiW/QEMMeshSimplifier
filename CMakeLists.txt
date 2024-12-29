@@ -49,7 +49,9 @@ find_package(OpenMesh REQUIRED)
 target_sources(QEMSimplifier PRIVATE
     src/main.cpp
     src/parser.cpp
+    src/QEMSimplifier.cpp
     include/parser.h
+    include/QEMSimplifier.h
 )
 
 # Include directories for the executable
@@ -88,6 +90,7 @@ add_executable(QEMSimplifierTests)
 target_sources(QEMSimplifierTests PRIVATE
     tests/QEMSimplifierTests.cpp
     src/parser.cpp
+    src/QEMSimplifier.cpp
 )
 
 # Include directories for tests
