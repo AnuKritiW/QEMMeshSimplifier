@@ -17,6 +17,19 @@ public:
     void computeQuadrics(TriMesh& mesh);
     QMatrix computeFaceQuadric(TriMesh& mesh, TriMesh::FaceHandle fh);
     void initializeQuadricsToZero(TriMesh& mesh);
+    void simplifyMesh(TriMesh& mesh, size_t targetFaces);
+    float computeEdgeCollapseCost(TriMesh& mesh, TriMesh::EdgeHandle edge, Eigen::Vector3d& optPos);
+
+    struct EdgeInfo {
+        TriMesh::EdgeHandle edgeHandle;
+        double cost;
+        Eigen::Vector3d optPos;
+
+        // For priority queue -> we want a min-heap, so operator> sorts by cost ascending
+        bool operator>(const EdgeInfo& rhs) const {
+            return cost > rhs.cost;
+        }
+    };
 };
 
 #endif // QEMSIMPLIFIER_H_

@@ -1,4 +1,5 @@
 #include "QEMSimplifier.h"
+#include <queue>
 
 static OpenMesh::VPropHandleT<Eigen::Matrix4d> vQuadric;
 
@@ -69,5 +70,32 @@ void QEMSimplifier::computeQuadrics(TriMesh& mesh)
         {
             mesh.property(vQuadric, *fv_it) += Kp;
         }
+    }
+}
+
+float QEMSimplifier::computeEdgeCollapseCost(TriMesh& mesh, TriMesh::EdgeHandle edge, Eigen::Vector3d& optPos)
+{
+
+}
+
+void QEMSimplifier::simplifyMesh(TriMesh& mesh, size_t targetFaces)
+{
+    computeQuadrics(mesh);
+
+    // Build the initial priority queue of edges
+    // the one with the lowest cost is always at the top (min-heap)
+    std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>> pq;
+
+    // for every edge, compute the cost and the new pos
+    for (auto e_it = mesh.edges_begin(); e_it != mesh.edges_end(); ++e_it)
+    {
+        Eigen::Vector3d optPos; // optimal position
+        float cost = computeEdgeCollapseCost(mesh, *e_it, optPos);
+
+        EdgeInfo edgeInfo;
+        edgeInfo.edgeHandle = *e_it;
+        edgeInfo.cost = cost;
+        edgeInfo.optPos = optPos;
+        pq.push(edgeInfo);
     }
 }
