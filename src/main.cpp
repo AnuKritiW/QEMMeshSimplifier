@@ -1,11 +1,14 @@
 #include <cstdlib>
 #include <iostream>
+#include <Eigen/Dense>
 
 #include "parser.h"
+#include "polyscope/polyscope.h"
+#include "polyscope/surface_mesh.h"
 
 int main() {
     TriMesh mesh;
-    std::string filename = "object-files/icosahedron.obj";
+    std::string filename = "object-files/gourd.obj";
 
     if (!Parser::loadMesh(filename, mesh)) {
         return EXIT_FAILURE;
@@ -13,12 +16,18 @@ int main() {
 
     std::cout << "Mesh loaded successfully!" << std::endl;
 
-    // Example: Print vertex information
-    for (auto vertex : mesh.vertices()) {
-        auto point = mesh.point(vertex);
-        std::cout << "Vertex " << vertex.idx() << ": ("
-                  << point[0] << ", " << point[1] << ", " << point[2] << ")" << std::endl;
-    }
+    // Create matrices to store vertices and faces
+    Eigen::MatrixXd vertices_matrix;
+    Eigen::MatrixXi faces_matrix;
+
+    // Extract vertex and face data from the mesh
+    Parser::extractMeshData(mesh, vertices_matrix, faces_matrix);
+
+    // Polyscope viewer
+    polyscope::init();
+    polyscope::registerSurfaceMesh("icosahedron", vertices_matrix, faces_matrix);
+    polyscope::show();
+    std::cout << "Polyscope viewer initialised!\n";
 
     return EXIT_SUCCESS;
 }
