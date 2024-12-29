@@ -25,3 +25,5 @@
 # Ignore system files
 .DS_Store
 Thumbs.db
+
+*.ini
