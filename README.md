@@ -18,68 +18,38 @@
     5. Iteratively remove the pair <strong>(v<sub>1</sub>, v<sub>2</sub>)</strong> of least cost from the heap, constract this pair, and update the costs of all valid pairs involving <strong>v<sub>1</sub></strong>
 </strong>
 
-* Psuedo-ish code to my understanding
+* Psuedo-ish code
+```
+Function simplifyMesh(mesh, targetFaces):
+    # Precompute vertex quadrics
+    computeQuadrics(mesh)
 
-```python
-def GetValidPairs(_v1, _start_idx, _model):
-    threshold = t # some arbitrary value
-    valid_pairs = []
+    # Initialize priority queue (min-heap) for edges
+    Declare priority queue, pq
+    For each edge e in the mesh:
+        computeEdgeCollapseCost(mesh, e) --> optimal position; collapse cost
+        Create EdgeInfo(edgeHandle, cost, optpos)
+        pq.insert(EdgeInfo)
 
-    # ensure no repeated pairings
-    for idx in range(start_idx, len(_model.vertices)):
-        v2 = _model.vertices[idx]
-        if (_v1 != v2):
-            if ((IsEdge(_v1, v2)) || (Dist(_v1, v2) < threshold)):
-                valid_pairs.insert(v2))
+    # Simplify mesh
+    While (numFaces in mesh > targetFaces) && (!pq.empty()):
+        # Pop the edge with the smallest cost
+        topEdge = pq.pop()
 
-    return valid_pairs
+        # Attempt to collapse the edge
+        If !collapseEdge(mesh, topEdge.edgeHandle, topEdge.optimalPos):
+            continue;
 
+        # Rebuild the priority queue after the collapse
+        Remove deleted elements
+        Clear the priority queue
 
-def SimplifyModel(_model):
-    valid_pairs = {} # of the form {v1: {v2, v4, v5}, v2: {v3}, etc.}; no repeated pairs
-    v_to_Q_dict = {}
+        For each remaining edge e in the mesh:
+            If e is deleted, skip
+            Ensure the quadric property exists for vertices
+            Compute the cost and optimal position for e using computeEdgeCollapseCost
+            Create EdgeInfo object and insert into pq
 
-    for idx in range(len(_model.vertices)):
-        v = _model.vertices[idx]
-
-        """
-        Compute error matrix Q at v # 4x4 matrix
-        """
-
-        v_to_Q_dict[v] = Q
-        valid_pairs[v] = set(GetValidPairs(v, idx, _model))
-
-    min_heap = []
-    for (key, value) in valid_pairs:
-        minDist = np.array([[0],
-                            [0],
-                            [0],
-                            [1]])
-        avg_Q = v_to_Q_dict[key] + v_to_Q_dict[value]
-        new_v = np.dot(np.linalg.inv(avg_Q), minDist) # perform matrix multiplication
-
-        # Compute cost for contracting the vertex_pair
-        cost = np.dot(np.dot(np.transpose(new_v), avg_Q), new_v)
-
-        # min_heap is organized by cost, with the smallest cost at the root
-        heapq.heappush(min_heap, (cost, (key, value), new_v))
-
-    while min_heap:
-        cost, vertex_pair, new_v = heapq.heappop(min_heap)
-
-        # contract vertex_pair
-        v1 = vertex_pair.first
-        v2 = vertex_pair.second
-
-        # since the value in valid_pairs is a set, repetitions are handled automatically
-        valid_pairs[v1].insert(valid_pairs[v2])
-
-        # since repeated pairs were handled in GetValidPairs always iterating thorugh a partial range as needed, v2 no longer exists in valid_pairs
-
-        """
-        TODO:
-        Update v1 to new_v in valid_pairs
-        Update costs for pairs involving v1
-        """
-
+    # Cleanup
+End Function
 ```
