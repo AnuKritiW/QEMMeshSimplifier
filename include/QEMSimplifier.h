@@ -11,14 +11,14 @@ typedef Eigen::Matrix4d QMatrix;
 class QEMSimplifier
 {
 public:
-    Eigen::Vector4d computePlaneEquation(const TriMesh::Point& p0,
-                                         const TriMesh::Point& p1,
-                                         const TriMesh::Point& p2);
-    void computeQuadrics(TriMesh& mesh);
-    QMatrix computeFaceQuadric(TriMesh& mesh, TriMesh::FaceHandle fh);
-    void initializeQuadricsToZero(TriMesh& mesh);
-    void simplifyMesh(TriMesh& mesh, size_t targetFaces);
-    float computeEdgeCollapseCost(TriMesh& mesh, TriMesh::EdgeHandle edge, Eigen::Vector3d& optPos);
+    Eigen::Vector4d computePlaneEquation(const TriMesh::Point& _p0,
+                                         const TriMesh::Point& _p1,
+                                         const TriMesh::Point& _p2);
+    void computeQuadrics(TriMesh& _mesh);
+    QMatrix computeFaceQuadric(TriMesh& _mesh, TriMesh::FaceHandle _face);
+    void initializeQuadricsToZero(TriMesh& _mesh);
+    void simplifyMesh(TriMesh& _mesh, size_t _tgtNumFaces);
+    float computeEdgeCollapseCost(TriMesh& _mesh, TriMesh::EdgeHandle _edge, Eigen::Vector3d& _optPos);
 
     struct EdgeInfo {
         TriMesh::EdgeHandle edgeHandle;
