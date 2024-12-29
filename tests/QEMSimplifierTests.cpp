@@ -241,7 +241,8 @@ TEST(QEMSimplifier, computeQuadrics)
     }
 }
 
-TEST(QEMSimplifier, ComputeQuadricsMeshFile) {
+TEST(QEMSimplifier, computeQuadricsMeshFile)
+{
     QEMSimplifier qem;
     TriMesh mesh;
 
@@ -263,4 +264,86 @@ TEST(QEMSimplifier, ComputeQuadricsMeshFile) {
 
         EXPECT_FALSE(quadric.isZero()); // Ensure quadric is updated
     }
+}
+
+TEST(QEMSimplifier, computeEdgeCollapseCostFromObj)
+{
+    QEMSimplifier qem;
+    TriMesh mesh;
+
+    std::string objFilePath = "../object-files/gourd.obj";
+    ASSERT_TRUE(Parser::loadMesh(objFilePath, mesh));
+
+    qem.computeQuadrics(mesh);
+
+    // Validate quadrics are non-zero
+    for (auto v_it = mesh.vertices_begin(); v_it != mesh.vertices_end(); ++v_it)
+    {
+        ASSERT_FALSE(qem.getVertexQuadric(mesh, *v_it).isZero());
+    }
+
+    // Iterate through edges and compute collapse cost
+    for (auto e_it = mesh.edges_begin(); e_it != mesh.edges_end(); ++e_it)
+    {
+        Eigen::Vector3d optPos;
+        float cost = qem.computeEdgeCollapseCost(mesh, *e_it, optPos);
+
+        // Retrieve vertex handles for the edge
+        auto he = mesh.halfedge_handle(*e_it, 0);
+        TriMesh::VertexHandle v0 = mesh.to_vertex_handle(he);
+        TriMesh::VertexHandle v1 = mesh.from_vertex_handle(he);
+
+        QMatrix Q = qem.getVertexQuadric(mesh, v0) + qem.getVertexQuadric(mesh, v1);
+
+        // Note that there is duplication of logic here from the function, so the calculations are not fully independent
+        // What's being tested here is that we are not entering the fallback logic in this test
+        Eigen::Matrix3d A = Q.topLeftCorner<3, 3>();
+        Eigen::Vector3d b(-Q(0, 3), -Q(1, 3), -Q(2, 3));
+        float det = A.determinant();
+
+        // Ensure determinant is non-zero and we are NOT entering the fallback case
+        EXPECT_GT(det, 1e-12);
+
+        // Validate the computed optimal position (vOpt)
+        if (det > 1e-12) // Ensure we're not in the fallback condition
+        {
+            Eigen::Vector3d expectedOptPos = A.inverse() * b;
+            EXPECT_NEAR(optPos[0], expectedOptPos[0], g_tolerance);
+            EXPECT_NEAR(optPos[1], expectedOptPos[1], g_tolerance);
+            EXPECT_NEAR(optPos[2], expectedOptPos[2], g_tolerance);
+        }
+
+        // Ensure collapse cost is greater than zero
+        EXPECT_GT(cost, 0.0f);
+    }
+}
+
+TEST(QEMSimplifier, ComputeEdgeCollapseCostFallback) // Hits fallback for A
+{
+    QEMSimplifier qem;
+    TriMesh mesh;
+
+    TriMesh::VertexHandle v0 = mesh.add_vertex(TriMesh::Point(0, 0, 0));
+    TriMesh::VertexHandle v1 = mesh.add_vertex(TriMesh::Point(1, 0, 0));
+    TriMesh::VertexHandle v2 = mesh.add_vertex(TriMesh::Point(0, 1, 0)); // Non-collinear vertex
+
+    mesh.add_face({v0, v1, v2}); // Create a valid triangular face to generate edges
+    qem.computeQuadrics(mesh);
+
+    for (auto v_it = mesh.vertices_begin(); v_it != mesh.vertices_end(); ++v_it)
+    {
+        ASSERT_FALSE(qem.getVertexQuadric(mesh, *v_it).isZero());
+    }
+
+    auto edge = *mesh.edges_begin(); // Get the first edge in the mesh
+    Eigen::Vector3d optPos;
+    float cost = qem.computeEdgeCollapseCost(mesh, edge, optPos);
+
+    EXPECT_NEAR(optPos[0], 0.5, g_tolerance); // Midpoint x-coordinate
+    EXPECT_NEAR(optPos[1], 0.0, g_tolerance); // Midpoint y-coordinate
+    EXPECT_NEAR(optPos[2], 0.0, g_tolerance); // Midpoint z-coordinate
+
+    // The cost is 0 because the geo and quadrics align such that no error is incurred at the optPos
+    // This happens because the triangle lies flat in the XY-plane, and the edge collapse does not deviate from this plane
+    EXPECT_EQ(cost, 0.0);
 }
