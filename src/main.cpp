@@ -93,6 +93,12 @@ int main() {
 
             rebuildPolyscopeMesh(mesh);
         }
+
+        // Mesh Statistics
+        ImGui::Text("Mesh Statistics");
+        ImGui::Text("Vertices: %zu", mesh.n_vertices());
+        ImGui::Text("Edges: %zu", mesh.n_edges());
+        ImGui::Text("Faces: %zu", mesh.n_faces());
     };
 
     polyscope::show();
