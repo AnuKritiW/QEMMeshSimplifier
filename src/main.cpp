@@ -42,13 +42,24 @@ int main() {
     polyscope::init();
     polyscope::registerSurfaceMesh("Surface Mesh", vertices_matrix, faces_matrix);
 
-    polyscope::state::userCallback = [&mesh]()
+    float simplifyPercentage = 10.0f; // Default to 10%
+    polyscope::state::userCallback = [&mesh, &simplifyPercentage]()
     {
+        ImGui::Text("Simplification Settings");
+        ImGui::SliderFloat("Percentage to Simplify", &simplifyPercentage, 0.0f, 100.0f, "%.1f%%");
+
         // Polyscope uses ImGui
-        if (ImGui::Button("Simplify Once"))
+        if (ImGui::Button("Simplify Mesh"))
         {
+            size_t tgtNumFaces = static_cast<size_t>(
+                mesh.n_faces() * (1.0f - simplifyPercentage / 100.0f)
+            );
+            if (tgtNumFaces < 1) {
+                tgtNumFaces = 1; // Ensure at least one face remains
+            }
+
             QEMSimplifier simplifier;
-            simplifier.simplifyMesh(mesh, mesh.n_faces() - 50); // remove 50 faces each time
+            simplifier.simplifyMesh(mesh, tgtNumFaces);
 
             rebuildPolyscopeMesh(mesh);
         }
