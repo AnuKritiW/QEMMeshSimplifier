@@ -141,13 +141,80 @@ float QEMSimplifier::computeEdgeCollapseCost(TriMesh& _mesh, TriMesh::EdgeHandle
     return cost;    // collapse cost
 }
 
+// Collapse an edge with a known new vertex position
+// * Merges quadrics
+// * Moves the final vertex
+// * Uses mesh.collapse(heh) from OpenMesh
+bool QEMSimplifier::collapseEdge(TriMesh& _mesh, TriMesh::EdgeHandle _edge, const Eigen::Vector3d& _newPos)
+{
+    if (!_edge.is_valid())
+    {
+        std::cerr << "Invalid edge handle\n";
+        return false;
+    }
+    // Pick which halfedge is used.
+    // By convention, choose the halfedge whose "to_vertex()" is the one we keep
+    // i.e. remove the src vertex and keep the tgt vertex of the chosen halfedge
+    TriMesh::HalfedgeHandle he0 = _mesh.halfedge_handle(_edge, 0);
+    if (!he0.is_valid())
+    {
+        std::cerr << "Invalid halfedge handle\n";
+        return false;
+    }
+
+    TriMesh::VertexHandle vKeep   = _mesh.to_vertex_handle(he0);
+    TriMesh::VertexHandle vRemove = _mesh.from_vertex_handle(he0);
+
+    if (!_mesh.get_property_handle(vQuadric, "v:quadric"))
+    {
+        std::cerr << "vQuadric property not initialized\n";
+        return false;
+    }
+    // Merge quadrics
+    QMatrix QSum = _mesh.property(vQuadric, vKeep) + _mesh.property(vQuadric, vRemove);
+
+    // Assign to the kept vert
+    _mesh.property(vQuadric, vKeep) = QSum;
+
+    // Move kept vert to the new position
+    _mesh.set_point(vKeep, TriMesh::Point((float)_newPos[0], (float)_newPos[1], (float)_newPos[2]));
+
+    // Collapse
+    // If OpenMesh forbids this collapse due to topological constraints, skip
+
+    std::cout << "Vertices: " << _mesh.n_vertices() << "\n";
+    std::cout << "Edges: " << _mesh.n_edges() << "\n";
+    std::cout << "Faces: " << _mesh.n_faces() << "\n";
+
+    if (!_mesh.is_collapse_ok(he0))
+    {
+        std::cerr << "Edge collapse not allowed for edge: " << _edge.idx() << "\n";
+        return false;
+    }
+
+    _mesh.collapse(he0);
+
+    std::cout << "Vertices: " << _mesh.n_vertices() << "\n";
+    std::cout << "Edges: " << _mesh.n_edges() << "\n";
+    std::cout << "Faces: " << _mesh.n_faces() << "\n";
+    return true;
+}
+
 void QEMSimplifier::simplifyMesh(TriMesh& _mesh, size_t _tgtNumFaces)
 {
     computeQuadrics(_mesh);
 
+    // tell the mesh to allocate internal “status” flags for vertices, edges, faces, and halfedges.
+    // collapse needs status attrib
+    // also allows calling of garbage collection at the end.
+    _mesh.request_vertex_status();
+    _mesh.request_edge_status();
+    _mesh.request_face_status();
+    _mesh.request_halfedge_status();
+
     // Build the initial priority queue of edges
     // the one with the lowest cost is always at the top (min-heap)
-    std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>> pq;
+    std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>> priQ;
 
     // for every edge, compute the cost and the new pos
     for (auto e_it = _mesh.edges_begin(); e_it != _mesh.edges_end(); ++e_it)
@@ -159,6 +226,26 @@ void QEMSimplifier::simplifyMesh(TriMesh& _mesh, size_t _tgtNumFaces)
         edgeInfo.edgeHandle = *e_it;
         edgeInfo.cost = cost;
         edgeInfo.optPos = optPos;
-        pq.push(edgeInfo);
+        priQ.push(edgeInfo);
+    }
+
+    while (_mesh.n_faces() > _tgtNumFaces && !priQ.empty())
+    {
+        EdgeInfo top = priQ.top();
+        priQ.pop();
+
+        if (!top.edgeHandle.is_valid())
+        {
+            continue; // might be stale
+        }
+        if (_mesh.status(top.edgeHandle).deleted())
+        {
+            continue; // edge might have been collapsed already
+        }
+
+        if (!collapseEdge(_mesh, top.edgeHandle, top.optPos)) // needs status attrib
+        {
+            continue;
+        }
     }
 }

@@ -347,3 +347,155 @@ TEST(QEMSimplifier, ComputeEdgeCollapseCostFallback) // Hits fallback for A
     // This happens because the triangle lies flat in the XY-plane, and the edge collapse does not deviate from this plane
     EXPECT_EQ(cost, 0.0);
 }
+
+TEST(QEMSimplifier, collapseEdge)
+{
+    QEMSimplifier qem;
+    TriMesh mesh;
+
+    // TODO: move into a function
+    // Example inspired from Figure 1 in the paper "Surface Simplification Using Quadric Error Metrics"
+    TriMesh::VertexHandle v1 = mesh.add_vertex(TriMesh::Point(0.0, 0.0, 0.0));
+    TriMesh::VertexHandle v2 = mesh.add_vertex(TriMesh::Point(1.0, 0.0, 0.0));
+    TriMesh::VertexHandle v3 = mesh.add_vertex(TriMesh::Point(-0.5, 1.0, 0.0));
+    TriMesh::VertexHandle v4 = mesh.add_vertex(TriMesh::Point(0.5, 1.5, 0.0));
+    TriMesh::VertexHandle v5 = mesh.add_vertex(TriMesh::Point(1.5, 1.0, 0.0));
+    TriMesh::VertexHandle v6 = mesh.add_vertex(TriMesh::Point(-1.0, 0.0, 0.0));
+    TriMesh::VertexHandle v7 = mesh.add_vertex(TriMesh::Point(2.0, 0.0, 0.0));
+    TriMesh::VertexHandle v8 = mesh.add_vertex(TriMesh::Point(-0.5, -1.0, 0.0));
+    TriMesh::VertexHandle v9 = mesh.add_vertex(TriMesh::Point(0.5, -1.5, 0.0));
+    TriMesh::VertexHandle v10 = mesh.add_vertex(TriMesh::Point(1.5, -1.0, 0.0));
+
+    mesh.add_face({v1, v8, v9});
+    mesh.add_face({v1, v6, v8});
+    mesh.add_face({v1, v3, v6});
+    mesh.add_face({v1, v4, v3});
+    mesh.add_face({v1, v2, v4});
+    mesh.add_face({v1, v9, v2});
+    mesh.add_face({v2, v5, v4});
+    mesh.add_face({v2, v7, v5});
+    mesh.add_face({v2, v10, v7});
+    mesh.add_face({v2, v9, v10});
+
+    // Verify initial mesh structure
+    EXPECT_EQ(mesh.n_vertices(), 10);
+    EXPECT_EQ(mesh.n_faces(), 10);
+    EXPECT_EQ(mesh.n_edges(), 19);
+
+    qem.computeQuadrics(mesh);
+
+    // Ensure quadrics are initialized
+    ASSERT_FALSE(qem.getVertexQuadric(mesh, v1).isZero());
+    ASSERT_FALSE(qem.getVertexQuadric(mesh, v2).isZero());
+    ASSERT_FALSE(qem.getVertexQuadric(mesh, v3).isZero());
+    ASSERT_FALSE(qem.getVertexQuadric(mesh, v4).isZero());
+    ASSERT_FALSE(qem.getVertexQuadric(mesh, v5).isZero());
+    ASSERT_FALSE(qem.getVertexQuadric(mesh, v6).isZero());
+    ASSERT_FALSE(qem.getVertexQuadric(mesh, v7).isZero());
+    ASSERT_FALSE(qem.getVertexQuadric(mesh, v8).isZero());
+    ASSERT_FALSE(qem.getVertexQuadric(mesh, v9).isZero());
+    ASSERT_FALSE(qem.getVertexQuadric(mesh, v10).isZero());
+
+    // Request necessary status flags
+    // needed for is_collapse_ok()
+    mesh.request_vertex_status();
+    mesh.request_edge_status();
+    mesh.request_face_status();
+
+    // Find the edge between v1 and v2
+    TriMesh::EdgeHandle edge;
+    for (auto e_it = mesh.edges_begin(); e_it != mesh.edges_end(); ++e_it)
+    {
+        auto he0 = mesh.halfedge_handle(*e_it, 0);
+        auto he1 = mesh.halfedge_handle(*e_it, 1);
+
+        if ((mesh.to_vertex_handle(he0) == v2 && mesh.from_vertex_handle(he0) == v1) ||
+            (mesh.to_vertex_handle(he1) == v1 && mesh.from_vertex_handle(he1) == v2))
+        {
+            edge = *e_it;
+            break;
+        }
+    }
+
+    ASSERT_TRUE(edge.is_valid());
+
+    // Check if the collapse is allowed
+    TriMesh::HalfedgeHandle he0 = mesh.halfedge_handle(edge, 0);
+    ASSERT_TRUE(mesh.is_collapse_ok(he0));
+
+    TriMesh::VertexHandle vKeep = mesh.to_vertex_handle(he0); // By convention, keep "to_vertex"
+
+    // Compute the new position for vKeep (midpoint of v1 and v2)
+    Eigen::Vector3d newPos;
+    TriMesh::Point p1 = mesh.point(v1);
+    TriMesh::Point p2 = mesh.point(v2);
+    newPos[0] = (p1[0] + p2[0]) / 2.0;
+    newPos[1] = (p1[1] + p2[1]) / 2.0;
+    newPos[2] = (p1[2] + p2[2]) / 2.0;
+
+    // Collapse the edge
+    ASSERT_TRUE(qem.collapseEdge(mesh, edge, newPos));
+
+    // Remove deleted vertices, edges, and faces from the mesh
+    mesh.garbage_collection();
+
+    // Verify the state of the mesh after collapse
+    EXPECT_EQ(mesh.n_vertices(), 9);
+    EXPECT_EQ(mesh.n_faces(), 8);
+    EXPECT_EQ(mesh.n_edges(), 16);
+
+    // Verify the position of the new vertex
+    TriMesh::Point vKeepPos = mesh.point(vKeep);
+
+    EXPECT_FLOAT_EQ(vKeepPos[0], newPos[0]) << "x-coordinate of new vertex is incorrect.";
+    EXPECT_FLOAT_EQ(vKeepPos[1], newPos[1]) << "y-coordinate of new vertex is incorrect.";
+    EXPECT_FLOAT_EQ(vKeepPos[2], newPos[2]) << "z-coordinate of new vertex is incorrect.";
+}
+
+TEST(QEMSimplifier, collapseEdgeNotAllowed)
+{
+    QEMSimplifier qem;
+    TriMesh mesh;
+
+    // Create a simple triangle mesh
+    TriMesh::VertexHandle v0 = mesh.add_vertex(TriMesh::Point(0.0, 0.0, 0.0));
+    TriMesh::VertexHandle v1 = mesh.add_vertex(TriMesh::Point(1.0, 0.0, 0.0));
+    TriMesh::VertexHandle v2 = mesh.add_vertex(TriMesh::Point(0.5, 1.0, 0.0));
+    mesh.add_face({v0, v1, v2});
+
+    // Request necessary status flags
+    // needed for is_collapse_ok()
+    mesh.request_vertex_status();
+    mesh.request_edge_status();
+    mesh.request_face_status();
+
+    qem.computeQuadrics(mesh);
+
+    // Ensure quadrics are initialized
+    ASSERT_FALSE(qem.getVertexQuadric(mesh, v0).isZero());
+    ASSERT_FALSE(qem.getVertexQuadric(mesh, v1).isZero());
+    ASSERT_FALSE(qem.getVertexQuadric(mesh, v2).isZero());
+
+    // Get the edge between v0 and v1
+    TriMesh::EdgeHandle edge;
+    for (auto he_it = mesh.voh_iter(v0); he_it.is_valid(); ++he_it)
+    {
+        if (mesh.to_vertex_handle(*he_it) == v1)
+        {
+            edge = mesh.edge_handle(*he_it);
+            break;
+        }
+    }
+
+    // New position for vKeep
+    Eigen::Vector3d newPos(0.5, 0.0, 0.0); // Midpoint of v0 and v1
+
+    // Collapse the edge
+    // Should fail because only a planar triangle has been passed
+    ASSERT_FALSE(qem.collapseEdge(mesh, edge, newPos));
+
+    // Validate the mesh after collapse fails
+    EXPECT_EQ(mesh.n_vertices(), 3);
+    EXPECT_EQ(mesh.n_edges(), 3);
+    EXPECT_EQ(mesh.n_faces(), 1);
+}

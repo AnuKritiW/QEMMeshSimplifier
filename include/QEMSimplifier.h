@@ -21,9 +21,12 @@ public:
     void initializeQuadricsToZero(TriMesh& _mesh);
     void simplifyMesh(TriMesh& _mesh, size_t _tgtNumFaces);
     float computeEdgeCollapseCost(TriMesh& _mesh, TriMesh::EdgeHandle _edge, Eigen::Vector3d& _optPos);
-    QMatrix& getVertexQuadric(TriMesh& mesh, const TriMesh::VertexHandle& vh) const {
+    QMatrix& getVertexQuadric(TriMesh& mesh, const TriMesh::VertexHandle& vh) const
+    {
         return mesh.property(vQuadric, vh);
     }
+
+    bool collapseEdge(TriMesh& _mesh, TriMesh::EdgeHandle _edge, const Eigen::Vector3d& _newPos);
 
     struct EdgeInfo {
         TriMesh::EdgeHandle edgeHandle;
