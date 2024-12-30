@@ -29,7 +29,7 @@ jobs:
     # Install OpenMesh
     - name: Install OpenMesh
       run: |
-        git clone https://www.graphics.rwth-aachen.de:9000/OpenMesh/OpenMesh.git
+        git clone --recurse-submodules https://www.graphics.rwth-aachen.de:9000/OpenMesh/OpenMesh.git
         mkdir OpenMesh/build && cd OpenMesh/build
         cmake .. -DCMAKE_BUILD_TYPE=Release
         make -j$(nproc)
