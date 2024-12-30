@@ -85,3 +85,17 @@ Function computeEdgeCollapseCost(mesh, edgeHandle, optPos):
 End Function
 
 ```
+
+Results as of 30 Dec 2024:
+
+Original gourd:
+
+![image](./References/gourd-original.png)
+
+200 faces:
+
+![image](./References/gourd-200faces.png)
+
+100 faces:
+
+![image](./References/gourd-100faces.png)
