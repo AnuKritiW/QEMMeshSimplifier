@@ -63,6 +63,12 @@ int main() {
 
             rebuildPolyscopeMesh(mesh);
         }
+
+        if (ImGui::Button("Reset Mesh"))
+        {
+            Parser::loadMesh("object-files/gourd.obj", mesh);
+            rebuildPolyscopeMesh(mesh);
+        }
     };
 
     polyscope::show();
