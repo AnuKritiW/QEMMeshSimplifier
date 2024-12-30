@@ -5,6 +5,7 @@
 #include "parser.h"
 #include "polyscope/polyscope.h"
 #include "polyscope/surface_mesh.h"
+#include "QEMSimplifier.h"
 
 int main() {
     TriMesh mesh;
@@ -15,6 +16,13 @@ int main() {
     }
 
     std::cout << "Mesh loaded successfully!" << std::endl;
+
+    // TODO: add button to polyscope viewer which allows real time simplification
+    const unsigned int tgtNumFaces = 200;
+
+    // Initialize the QEMSimplifier and simplify the mesh
+    QEMSimplifier simplifier;
+    simplifier.simplifyMesh(mesh, tgtNumFaces);
 
     // Create matrices to store vertices and faces
     Eigen::MatrixXd vertices_matrix;

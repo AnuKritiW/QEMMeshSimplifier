@@ -234,18 +234,30 @@ void QEMSimplifier::simplifyMesh(TriMesh& _mesh, size_t _tgtNumFaces)
         EdgeInfo top = priQ.top();
         priQ.pop();
 
-        if (!top.edgeHandle.is_valid())
-        {
-            continue; // might be stale
-        }
-        if (_mesh.status(top.edgeHandle).deleted())
-        {
-            continue; // edge might have been collapsed already
-        }
+        if (!top.edgeHandle.is_valid()) continue; // might be stale
+        if (_mesh.status(top.edgeHandle).deleted()) continue; // edge might have been collapsed already
 
-        if (!collapseEdge(_mesh, top.edgeHandle, top.optPos)) // needs status attrib
+         // collapseEdge needs status attrib
+        if (!collapseEdge(_mesh, top.edgeHandle, top.optPos)) continue;
+
+        // After collapse, one vertex is gone, adjacency changed
+        // So we must re-insert edges around the "kept" vertex
+        _mesh.garbage_collection();
+
+        std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>> empty;
+        std::swap(priQ, empty); // Clear priQ
+
+        for (auto e_it2 = _mesh.edges_begin(); e_it2 != _mesh.edges_end(); ++e_it2)
         {
-            continue;
+            if (_mesh.status(*e_it2).deleted()) continue;
+
+            Eigen::Vector3d opt;
+            float cst = computeEdgeCollapseCost(_mesh, *e_it2, opt);
+            EdgeInfo ei2{ *e_it2, cst, opt };
+            priQ.push(ei2);
         }
     }
+
+    // Clean up
+    _mesh.garbage_collection();
 }
