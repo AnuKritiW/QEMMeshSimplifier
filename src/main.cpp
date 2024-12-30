@@ -1,6 +1,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <Eigen/Dense>
+#include <stack>
 
 #include "parser.h"
 #include "polyscope/polyscope.h"
@@ -42,19 +43,26 @@ int main() {
     polyscope::init();
     polyscope::registerSurfaceMesh("Surface Mesh", vertices_matrix, faces_matrix);
 
-    float simplifyPercentage = 10.0f; // Default to 10%
-    polyscope::state::userCallback = [&mesh, &simplifyPercentage]()
+    polyscope::state::userCallback = [&mesh, &filename]()
     {
+        static float simplifyPercentage = 10.0f; // Default to 10%
+        static std::stack<TriMesh> meshHistory;  // Stack to hold mesh states for undo
+
         ImGui::Text("Simplification Settings");
         ImGui::SliderFloat("Percentage to Simplify", &simplifyPercentage, 0.0f, 100.0f, "%.1f%%");
 
         // Polyscope uses ImGui
         if (ImGui::Button("Simplify Mesh"))
         {
+            // Save current state for undo
+            meshHistory.push(mesh);
+
             size_t tgtNumFaces = static_cast<size_t>(
                 mesh.n_faces() * (1.0f - simplifyPercentage / 100.0f)
             );
-            if (tgtNumFaces < 1) {
+
+            if (tgtNumFaces < 1)
+            {
                 tgtNumFaces = 1; // Ensure at least one face remains
             }
 
@@ -64,9 +72,25 @@ int main() {
             rebuildPolyscopeMesh(mesh);
         }
 
+        // Undo Last Simplification Button
+        if (ImGui::Button("Undo Last Simplification") && !meshHistory.empty())
+        {
+            // Restore the last saved state
+            mesh = meshHistory.top();
+            meshHistory.pop();
+            rebuildPolyscopeMesh(mesh);
+        }
+
         if (ImGui::Button("Reset Mesh"))
         {
-            Parser::loadMesh("object-files/gourd.obj", mesh);
+            Parser::loadMesh(filename, mesh);
+
+            // Clear undo history
+            while (!meshHistory.empty())
+            {
+                meshHistory.pop();
+            }
+
             rebuildPolyscopeMesh(mesh);
         }
     };
