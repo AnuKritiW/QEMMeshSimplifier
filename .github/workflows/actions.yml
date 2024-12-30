@@ -1,0 +1,63 @@
+name: GTest CI
+
+on:
+  push:
+    branches: [ github-actions ]
+  pull_request:
+    branches: [ github-actions ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v2
+
+    # Update and install basic dependencies
+    - name: Update and install essential packages
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake build-essential libxi-dev libxmu-dev freeglut3-dev
+
+    # Install Eigen
+    - name: Install Eigen
+      run: |
+        git clone https://gitlab.com/libeigen/eigen.git
+        sudo cp -r eigen/Eigen /usr/local/include/Eigen
+
+    # Install OpenMesh
+    - name: Install OpenMesh
+      run: |
+        git clone https://www.graphics.rwth-aachen.de:9000/OpenMesh/OpenMesh.git
+        mkdir OpenMesh/build && cd OpenMesh/build
+        cmake .. -DCMAKE_BUILD_TYPE=Release
+        make -j$(nproc)
+        sudo make install
+
+    # Install Polyscope
+    - name: Install Polyscope
+      run: |
+        git clone https://github.com/nmwsharp/polyscope.git
+        mkdir polyscope/build && cd polyscope/build
+        cmake .. -DCMAKE_BUILD_TYPE=Release
+        make -j$(nproc)
+        sudo make install
+
+    # Install Google Test
+    - name: Install Google Test
+      run: |
+        git clone https://github.com/google/googletest.git
+        mkdir googletest/build && cd googletest/build
+        cmake .. -DCMAKE_BUILD_TYPE=Release
+        make -j$(nproc)
+        sudo make install
+
+    - name: Configure build
+      run: mkdir build && cd build && cmake -DCMAKE_BUILD_TYPE=Release ..
+
+    - name: Build project
+      run: cd build && make
+
+    - name: Run Tests
+      run: ./build/QEMSimplifierTests
