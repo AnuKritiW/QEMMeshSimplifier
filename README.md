@@ -99,3 +99,10 @@ Original gourd:
 100 faces:
 
 ![image](./References/gourd-100faces.png)
+
+TODOs:
+- optimization (is there a way to update priQ without clearing and repopulating; is it better?)
+- Add button in polyscope viewer to simplify to n faces in real time.
+- Test with more objects
+- Abstract out test cases if possible to clean up tests
+- Write tests for overall simplify method(?)
