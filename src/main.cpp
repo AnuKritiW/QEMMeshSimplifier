@@ -7,6 +7,7 @@
 #include "polyscope/polyscope.h"
 #include "polyscope/surface_mesh.h"
 #include "QEMSimplifier.h"
+#include "tinyfiledialogs.h"
 
 // Helper to re-extract the geometry from mesh and update Polyscope
 void rebuildPolyscopeMesh(TriMesh& _mesh)
@@ -20,7 +21,8 @@ void rebuildPolyscopeMesh(TriMesh& _mesh)
     polyscope::registerSurfaceMesh("Surface Mesh", vertices_matrix, faces_matrix);
 }
 
-int main() {
+int main()
+{
     TriMesh mesh;
     std::string filename = "object-files/gourd.obj";
 
@@ -47,6 +49,32 @@ int main() {
     {
         static float simplifyPercentage = 10.0f; // Default to 10%
         static std::stack<TriMesh> meshHistory;  // Stack to hold mesh states for undo
+
+        ImGui::Text("Select File");
+        if (ImGui::Button("Open File Explorer"))
+        {
+            const char* filters[] = { "*.obj" };
+
+            const char* homeDir = getenv("HOME");
+            if (!homeDir) // validate
+            {
+                homeDir = "";
+            }
+
+            const char* filePath = tinyfd_openFileDialog(
+                "Open .obj File",          // Dialog title
+                homeDir,                   // Default path
+                1,                         // Number of filters // sizeof(filters) / sizeof(filters[0])
+                filters,                   // Filter list
+                "OBJ files",     // Description for filters
+                0                          // Disallow multiple selection
+            );
+
+            if (filePath && Parser::loadMesh(filePath, mesh))
+            {
+                rebuildPolyscopeMesh(mesh);
+            }
+        }
 
         ImGui::Text("Simplification Settings");
         ImGui::SliderFloat("Percentage to Simplify", &simplifyPercentage, 0.0f, 100.0f, "%.1f%%");

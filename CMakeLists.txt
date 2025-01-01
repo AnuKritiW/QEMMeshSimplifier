@@ -36,6 +36,8 @@ set(POLYSCOPE_DIR /Users/Exhale/Desktop/CAVE/ASE/dependencies/polyscope)
 # set(EIGEN_DIR /home/s5647918/Code/dependencies/eigen)
 set(EIGEN_DIR /Users/Exhale/Desktop/CAVE/ASE/dependencies/eigen)
 
+set(TINYFILEDIALOGS_DIR /Users/Exhale/Desktop/CAVE/ASE/dependencies/tinyfiledialogs)
+
 #################################################################################
 # Main executable: QEMSimplifier
 #################################################################################
@@ -52,6 +54,7 @@ target_sources(QEMSimplifier PRIVATE
     src/QEMSimplifier.cpp
     include/parser.h
     include/QEMSimplifier.h
+    ${TINYFILEDIALOGS_DIR}/tinyfiledialogs.c
 )
 
 # Include directories for the executable
@@ -59,6 +62,7 @@ target_include_directories(QEMSimplifier PRIVATE
    ${OPENMESH_INCLUDE_DIR}
    ${OPENMESH_INCLUDE_DIR}/OpenMesh/Core
    ${EIGEN_DIR}
+   ${TINYFILEDIALOGS_DIR}
    include
 )
 
