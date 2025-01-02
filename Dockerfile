@@ -23,26 +23,24 @@ RUN apt-get update && apt-get install -y \
 # Set the working directory
 WORKDIR /app
 
-# Copy the entire project into the container
+# Clone and build OpenMesh
+RUN git clone --recurse-submodules https://www.graphics.rwth-aachen.de:9000/OpenMesh/OpenMesh.git dependencies/OpenMesh && \
+    cd dependencies/OpenMesh && mkdir -p build && cd build && \
+    cmake .. && make -j$(nproc) && make install
+
+# Clone Polyscope as a dependency
+RUN git clone --recurse-submodules https://github.com/nmwsharp/polyscope.git dependencies/polyscope
+
+# Clone and build Google Test
+RUN git clone https://github.com/google/googletest.git dependencies/googletest && \
+    cd dependencies/googletest && mkdir -p build && cd build && \
+    cmake .. && make -j$(nproc) && make install
+
+# Copy the project files into the container
 COPY . .
 
 # Copy object-files directory
 COPY object-files /app/object-files
-
-# Clean and rebuild OpenMesh
-RUN cd dependencies/OpenMesh && \
-    rm -rf build && mkdir -p build && cd build && \
-    cmake .. && make -j$(nproc) && make install
-
-# Clean and rebuild Polyscope
-RUN cd dependencies/polyscope && \
-    rm -rf build && mkdir -p build && cd build && \
-    cmake .. && make -j$(nproc) && make install
-
-# Clean and rebuild Google Test
-RUN cd dependencies/googletest && \
-    rm -rf build && mkdir -p build && cd build && \
-    cmake .. && make -j$(nproc) && make install
 
 # Prepare the build directory for your project
 RUN mkdir -p build && cd build && cmake .. && make -j$(nproc)
