@@ -4,6 +4,9 @@
 #include "QEMSimplifier.h"
 
 constexpr float g_tolerance = 1e-6;
+const std::string g_objFilesDir = "/app/object-files";
+const std::string g_icosahedronFile = g_objFilesDir + "/icosahedron.obj";
+const std::string g_gourdFile= g_objFilesDir + "/icosahedron.obj";
 
 int main(int argc, char **argv)
 {
@@ -18,8 +21,7 @@ int main(int argc, char **argv)
 TEST(Parser, LoadValidMesh)
 {
     TriMesh mesh;
-    std::string validFile = "../object-files/icosahedron.obj";
-    ASSERT_TRUE(Parser::loadMesh(validFile, mesh));
+    ASSERT_TRUE(Parser::loadMesh(g_icosahedronFile, mesh));
     EXPECT_EQ(mesh.n_vertices(), 12);
     EXPECT_EQ(mesh.n_faces(), 20);
 }
@@ -40,8 +42,7 @@ TEST(QEMSimplifier, initializeQuadricsToZero)
 {
     QEMSimplifier qem;
     TriMesh mesh;
-    std::string validFile = "../object-files/gourd.obj";
-    ASSERT_TRUE(Parser::loadMesh(validFile, mesh));
+    ASSERT_TRUE(Parser::loadMesh(g_gourdFile, mesh));
 
     static OpenMesh::VPropHandleT<QMatrix> vQuadric;
     if (!mesh.get_property_handle(vQuadric, "v:quadric"))
@@ -246,7 +247,7 @@ TEST(QEMSimplifier, computeQuadricsMeshFile)
     QEMSimplifier qem;
     TriMesh mesh;
 
-    ASSERT_TRUE(Parser::loadMesh("../object-files/icosahedron.obj", mesh));
+    ASSERT_TRUE(Parser::loadMesh(g_icosahedronFile, mesh));
 
     // Initialize property handle for quadrics
     static OpenMesh::VPropHandleT<QMatrix> vQuadric;
@@ -271,8 +272,7 @@ TEST(QEMSimplifier, computeEdgeCollapseCostFromObj)
     QEMSimplifier qem;
     TriMesh mesh;
 
-    std::string objFilePath = "../object-files/gourd.obj";
-    ASSERT_TRUE(Parser::loadMesh(objFilePath, mesh));
+    ASSERT_TRUE(Parser::loadMesh(g_gourdFile, mesh));
 
     qem.computeQuadrics(mesh);
 
