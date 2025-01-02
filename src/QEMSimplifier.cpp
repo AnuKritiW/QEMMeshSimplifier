@@ -182,10 +182,6 @@ bool QEMSimplifier::collapseEdge(TriMesh& _mesh, TriMesh::EdgeHandle _edge, cons
     // Collapse
     // If OpenMesh forbids this collapse due to topological constraints, skip
 
-    std::cout << "Vertices: " << _mesh.n_vertices() << "\n";
-    std::cout << "Edges: " << _mesh.n_edges() << "\n";
-    std::cout << "Faces: " << _mesh.n_faces() << "\n";
-
     if (!_mesh.is_collapse_ok(he0))
     {
         std::cerr << "Edge collapse not allowed for edge: " << _edge.idx() << "\n";
@@ -193,10 +189,6 @@ bool QEMSimplifier::collapseEdge(TriMesh& _mesh, TriMesh::EdgeHandle _edge, cons
     }
 
     _mesh.collapse(he0);
-
-    std::cout << "Vertices: " << _mesh.n_vertices() << "\n";
-    std::cout << "Edges: " << _mesh.n_edges() << "\n";
-    std::cout << "Faces: " << _mesh.n_faces() << "\n";
     return true;
 }
 
