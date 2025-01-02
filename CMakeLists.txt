@@ -16,27 +16,47 @@ endif()
 # Directories and paths setup
 #################################################################################
 
-# OpenMesh setup
-# set(OPENMESH_INCLUDE_DIR /home/s5647918/local/OpenMesh/include)
-# set(OPENMESH_LIB_DIR /home/s5647918/local/OpenMesh/lib)
+set(DEPENDENCIES_DIR ${CMAKE_SOURCE_DIR}/dependencies)
 
 # OpenMesh setup
-# set(OPENMESH_INCLUDE_DIR /usr/local/Cellar/open-mesh/11.0.0/include/OpenMesh)
-# set(OPENMESH_LIB_DIR /usr/local/Cellar/open-mesh/11.0.0/lib)
-
-# OpenMesh setup
-set(OPENMESH_INCLUDE_DIR /Users/Exhale/Desktop/CAVE/ASE/dependencies/OpenMesh/include)
-set(OPENMESH_LIB_DIR /Users/Exhale/Desktop/CAVE/ASE/dependencies/OpenMesh/build/Build/lib)
+set(OPENMESH_INCLUDE_DIR ${DEPENDENCIES_DIR}/OpenMesh/include)
+set(OPENMESH_LIB_DIR ${DEPENDENCIES_DIR}/OpenMesh/build/lib)
 
 # Polyscope setup
-# set(POLYSCOPE_DIR /home/s5647918/Code/dependencies/polyscope)
-set(POLYSCOPE_DIR /Users/Exhale/Desktop/CAVE/ASE/dependencies/polyscope)
+set(POLYSCOPE_DIR ${DEPENDENCIES_DIR}/polyscope)
 
 # Eigen setup
-# set(EIGEN_DIR /home/s5647918/Code/dependencies/eigen)
-set(EIGEN_DIR /Users/Exhale/Desktop/CAVE/ASE/dependencies/eigen)
+set(EIGEN_DIR ${DEPENDENCIES_DIR}/eigen)
 
-set(TINYFILEDIALOGS_DIR /Users/Exhale/Desktop/CAVE/ASE/dependencies/tinyfiledialogs)
+# Tinyfiledialogs setup
+set(TINYFILEDIALOGS_DIR ${DEPENDENCIES_DIR}/tinyfiledialogs)
+
+# Google Test setup
+set(GTEST_DIR ${DEPENDENCIES_DIR}/googletest)
+set(GTEST_LIB_DIR ${GTEST_DIR}/build/lib)
+set(GTEST_INCLUDE_DIR ${GTEST_DIR}/googletest/include)
+
+# # OpenMesh setup
+# # set(OPENMESH_INCLUDE_DIR /home/s5647918/local/OpenMesh/include)
+# # set(OPENMESH_LIB_DIR /home/s5647918/local/OpenMesh/lib)
+
+# # OpenMesh setup
+# # set(OPENMESH_INCLUDE_DIR /usr/local/Cellar/open-mesh/11.0.0/include/OpenMesh)
+# # set(OPENMESH_LIB_DIR /usr/local/Cellar/open-mesh/11.0.0/lib)
+
+# # OpenMesh setup
+# set(OPENMESH_INCLUDE_DIR /Users/Exhale/Desktop/CAVE/ASE/dependencies/OpenMesh/include)
+# set(OPENMESH_LIB_DIR /Users/Exhale/Desktop/CAVE/ASE/dependencies/OpenMesh/build/Build/lib)
+
+# # Polyscope setup
+# # set(POLYSCOPE_DIR /home/s5647918/Code/dependencies/polyscope)
+# set(POLYSCOPE_DIR /Users/Exhale/Desktop/CAVE/ASE/dependencies/polyscope)
+
+# # Eigen setup
+# # set(EIGEN_DIR /home/s5647918/Code/dependencies/eigen)
+# set(EIGEN_DIR /Users/Exhale/Desktop/CAVE/ASE/dependencies/eigen)
+
+# set(TINYFILEDIALOGS_DIR /Users/Exhale/Desktop/CAVE/ASE/dependencies/tinyfiledialogs)
 
 #################################################################################
 # Main executable: QEMSimplifier
@@ -79,8 +99,9 @@ target_link_libraries(QEMSimplifier PRIVATE polyscope)
 #################################################################################
 
 # Set GTest paths manually
-set(GTEST_LIB_DIR /Users/Exhale/Desktop/CAVE/ASE/dependencies/googletest/build/lib)
-set(GTEST_INCLUDE_DIR /Users/Exhale/Desktop/CAVE/ASE/dependencies/googletest/googletest/include)
+set(GTEST_DIR ${DEPENDENCIES_DIR}/googletest)
+set(GTEST_LIB_DIR ${GTEST_DIR}/build/lib)
+set(GTEST_INCLUDE_DIR ${GTEST_DIR}/googletest/include)
 
 # Find and include Google Test
 # find_package(GTest CONFIG REQUIRED)
