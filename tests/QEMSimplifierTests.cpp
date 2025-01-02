@@ -59,6 +59,7 @@ TEST(QEMSimplifier, initializeQuadricsToZero)
     for (auto v_it = mesh.vertices_begin(); v_it != mesh.vertices_end(); ++v_it)
     {
         QMatrix quadric = mesh.property(vQuadric, *v_it);
+        std::cout << "Quadric Matrix:\n" << quadric << std::endl;
         EXPECT_TRUE(quadric.isZero());
     }
 }

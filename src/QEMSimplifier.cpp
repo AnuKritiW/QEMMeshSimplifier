@@ -49,12 +49,12 @@ void QEMSimplifier::initializeQuadricsToZero(TriMesh& _mesh)
     if (!_mesh.get_property_handle(vQuadric, "v:quadric"))
     {
         _mesh.add_property(vQuadric, "v:quadric");
+    }
 
-        // Initialize quadrics to zero for all vertices
-        for (auto v_it = _mesh.vertices_begin(); v_it != _mesh.vertices_end(); ++v_it)
-        {
-            _mesh.property(vQuadric, *v_it) = QMatrix::Zero();
-        }
+    // Initialize quadrics to zero for all vertices
+    for (auto v_it = _mesh.vertices_begin(); v_it != _mesh.vertices_end(); ++v_it)
+    {
+        _mesh.property(vQuadric, *v_it) = QMatrix::Zero();
     }
 }
 

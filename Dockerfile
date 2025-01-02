@@ -24,7 +24,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Clone and build OpenMesh
-RUN git clone --recurse-submodules https://www.graphics.rwth-aachen.de:9000/OpenMesh/OpenMesh.git dependencies/OpenMesh && \
+RUN git clone --recursive https://gitlab.vci.rwth-aachen.de:9000/OpenMesh/OpenMesh.git dependencies/OpenMesh && \
     cd dependencies/OpenMesh && mkdir -p build && cd build && \
     cmake .. && make -j$(nproc) && make install
 
@@ -35,6 +35,13 @@ RUN git clone --recurse-submodules https://github.com/nmwsharp/polyscope.git dep
 RUN git clone https://github.com/google/googletest.git dependencies/googletest && \
     cd dependencies/googletest && mkdir -p build && cd build && \
     cmake .. && make -j$(nproc) && make install
+
+# Fetch and install Eigen
+RUN mkdir -p dependencies/eigen && \
+    wget -qO- https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz | tar xz -C dependencies/eigen --strip-components=1
+
+# Copy tinyfiledialogs directory
+COPY dependencies/tinyfiledialogs /app/dependencies/tinyfiledialogs
 
 # Copy the project files into the container
 COPY . .

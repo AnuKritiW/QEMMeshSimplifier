@@ -27,4 +27,6 @@
 Thumbs.db
 
 *.ini
-/dependencies
+
+/dependencies/*
+!/dependencies/tinyfiledialogs/
