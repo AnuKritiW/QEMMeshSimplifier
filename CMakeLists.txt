@@ -6,10 +6,38 @@ project(QEMSimplifier_build)
 
 # Set C++ standard
 set(CMAKE_CXX_STANDARD 17)
+# set(CMAKE_OSX_ARCHITECTURES "arm64" CACHE STRING "Build architecture")
+
+# Detect platform and architecture
+if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+    message(STATUS "Configuring for macOS")
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64")
+        set(CMAKE_OSX_ARCHITECTURES "arm64")
+        message(STATUS "Targeting arm64 on macOS (Apple Silicon)")
+    else()
+        set(CMAKE_OSX_ARCHITECTURES "x86_64")
+        message(STATUS "Targeting x86_64 on macOS (Intel)")
+    endif()
+elseif(CMAKE_SYSTEM_NAME MATCHES "Linux")
+    message(STATUS "Configuring for Linux")
+    # Add any architecture-specific handling for Linux if needed
+elseif(CMAKE_SYSTEM_NAME MATCHES "Windows")
+    message(STATUS "Configuring for Windows")
+    # Add any architecture-specific handling for Windows if needed
+else()
+    message(WARNING "Unsupported platform detected: ${CMAKE_SYSTEM_NAME}")
+endif()
 
 # Toolchain file handling (if defined in the environment)
 if(NOT DEFINED CMAKE_TOOLCHAIN_FILE AND DEFINED ENV{CMAKE_TOOLCHAIN_FILE})
    set(CMAKE_TOOLCHAIN_FILE $ENV{CMAKE_TOOLCHAIN_FILE})
+endif()
+
+# Check if building inside Docker
+if(DEFINED ENV{DOCKER_BUILD})
+    set(IS_DOCKER_BUILD TRUE)
+else()
+    set(IS_DOCKER_BUILD FALSE)
 endif()
 
 #################################################################################
@@ -18,45 +46,72 @@ endif()
 
 set(DEPENDENCIES_DIR ${CMAKE_SOURCE_DIR}/dependencies)
 
-# OpenMesh setup
-set(OPENMESH_INCLUDE_DIR ${DEPENDENCIES_DIR}/OpenMesh/include)
-set(OPENMESH_LIB_DIR ${DEPENDENCIES_DIR}/OpenMesh/build/lib)
-
-# Polyscope setup
-set(POLYSCOPE_DIR ${DEPENDENCIES_DIR}/polyscope)
-
-# Eigen setup
-set(EIGEN_DIR ${DEPENDENCIES_DIR}/eigen)
-
 # Tinyfiledialogs setup
 set(TINYFILEDIALOGS_DIR ${DEPENDENCIES_DIR}/tinyfiledialogs)
 
-# Google Test setup
-set(GTEST_DIR ${DEPENDENCIES_DIR}/googletest)
-set(GTEST_LIB_DIR ${GTEST_DIR}/build/lib)
-set(GTEST_INCLUDE_DIR ${GTEST_DIR}/googletest/include)
+if(IS_DOCKER_BUILD) # Docker dependencies (pre-installed)
+    # OpenMesh setup
+    set(OPENMESH_INCLUDE_DIR ${DEPENDENCIES_DIR}/OpenMesh/include)
+    set(OPENMESH_LIB_DIR ${DEPENDENCIES_DIR}/OpenMesh/build/lib)
 
-# # OpenMesh setup
-# # set(OPENMESH_INCLUDE_DIR /home/s5647918/local/OpenMesh/include)
-# # set(OPENMESH_LIB_DIR /home/s5647918/local/OpenMesh/lib)
+    # Polyscope setup
+    set(POLYSCOPE_DIR ${DEPENDENCIES_DIR}/polyscope)
+    add_subdirectory(${POLYSCOPE_DIR} ${CMAKE_BINARY_DIR}/polyscope_build)
 
-# # OpenMesh setup
-# # set(OPENMESH_INCLUDE_DIR /usr/local/Cellar/open-mesh/11.0.0/include/OpenMesh)
-# # set(OPENMESH_LIB_DIR /usr/local/Cellar/open-mesh/11.0.0/lib)
+    # Eigen setup
+    set(EIGEN_DIR ${DEPENDENCIES_DIR}/eigen)
 
-# # OpenMesh setup
-# set(OPENMESH_INCLUDE_DIR /Users/Exhale/Desktop/CAVE/ASE/dependencies/OpenMesh/include)
-# set(OPENMESH_LIB_DIR /Users/Exhale/Desktop/CAVE/ASE/dependencies/OpenMesh/build/Build/lib)
+    # Google Test setup
+    set(GTEST_DIR ${DEPENDENCIES_DIR}/googletest)
+    set(GTEST_LIB_DIR ${GTEST_DIR}/build/lib)
+    set(GTEST_INCLUDE_DIR ${GTEST_DIR}/googletest/include)
+else() # Local build: Fetch dependencies dynamically
+    include(FetchContent)
 
-# # Polyscope setup
-# # set(POLYSCOPE_DIR /home/s5647918/Code/dependencies/polyscope)
-# set(POLYSCOPE_DIR /Users/Exhale/Desktop/CAVE/ASE/dependencies/polyscope)
+    # Fetch OpenMesh
+    FetchContent_Declare(
+        openmesh
+        GIT_REPOSITORY https://www.graphics.rwth-aachen.de:9000/OpenMesh/OpenMesh.git
+        GIT_TAG master
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(openmesh)
 
-# # Eigen setup
-# # set(EIGEN_DIR /home/s5647918/Code/dependencies/eigen)
-# set(EIGEN_DIR /Users/Exhale/Desktop/CAVE/ASE/dependencies/eigen)
+    # Fetch Polyscope
+    FetchContent_Declare(
+        polyscope
+        GIT_REPOSITORY https://github.com/nmwsharp/polyscope.git
+        GIT_TAG master
+        GIT_SUBMODULES_RECURSE TRUE
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(polyscope)
 
-# set(TINYFILEDIALOGS_DIR /Users/Exhale/Desktop/CAVE/ASE/dependencies/tinyfiledialogs)
+    # Fetch Eigen
+    FetchContent_Declare(
+        eigen
+        URL https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(eigen)
+
+    # Fetch GoogleTest
+    FetchContent_Declare(
+        googletest
+        GIT_REPOSITORY https://github.com/google/googletest.git
+        GIT_TAG main
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(googletest)
+
+    # Set paths for fetched dependencies
+    set(OPENMESH_INCLUDE_DIR ${openmesh_SOURCE_DIR}/include)
+    set(OPENMESH_LIB_DIR ${openmesh_BINARY_DIR}/build/lib)
+    set(EIGEN_DIR ${eigen_SOURCE_DIR})
+    set(POLYSCOPE_DIR ${polyscope_SOURCE_DIR})
+    set(GTEST_INCLUDE_DIR ${googletest_SOURCE_DIR}/googletest/include)
+    set(GTEST_LIB_DIR ${googletest_BINARY_DIR})
+endif()
 
 #################################################################################
 # Main executable: QEMSimplifier
@@ -91,7 +146,6 @@ target_link_directories(QEMSimplifier PRIVATE ${OPENMESH_LIB_DIR})
 target_link_libraries(QEMSimplifier PRIVATE OpenMeshCore OpenMeshTools)
 
 # Add Polyscope subdirectory and link Polyscope to the executable
-add_subdirectory(${POLYSCOPE_DIR} ${CMAKE_BINARY_DIR}/polyscope_build)
 target_link_libraries(QEMSimplifier PRIVATE polyscope)
 
 #################################################################################
