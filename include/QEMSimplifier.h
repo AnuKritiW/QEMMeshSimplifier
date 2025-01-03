@@ -19,27 +19,25 @@ public:
     void computeQuadrics(TriMesh& _mesh);
     QMatrix computeFaceQuadric(TriMesh& _mesh, TriMesh::FaceHandle _face);
     void initializeQuadricsToZero(TriMesh& _mesh);
+    void initializeVersionstoZero(TriMesh& _mesh);
     void simplifyMesh(TriMesh& _mesh, size_t _tgtNumFaces);
     float computeEdgeCollapseCost(TriMesh& _mesh, TriMesh::EdgeHandle _edge, Eigen::Vector3d& _optPos);
-    QMatrix& getVertexQuadric(TriMesh& mesh, const TriMesh::VertexHandle& vh) const
+    bool collapseEdge(TriMesh& _mesh, TriMesh::EdgeHandle _edge, const Eigen::Vector3d& _newPos, TriMesh::VertexHandle& _vKeep);
+
+    struct EdgeInfo
     {
-        return mesh.property(vQuadric, vh);
-    }
-
-    bool collapseEdge(TriMesh& _mesh, TriMesh::EdgeHandle _edge, const Eigen::Vector3d& _newPos);
-
-    struct EdgeInfo {
         TriMesh::EdgeHandle edgeHandle;
-        double cost;
+        float cost;
         Eigen::Vector3d optPos;
 
-        // For priority queue -> we want a min-heap, so operator> sorts by cost ascending
-        bool operator>(const EdgeInfo& rhs) const {
+        int versionSum = 0;
+        bool operator>(const EdgeInfo& rhs) const
+        {
             return cost > rhs.cost;
         }
     };
 
-    OpenMesh::VPropHandleT<Eigen::Matrix4d> vQuadric;
+    QMatrix& getVertexQuadric(TriMesh& _mesh, const TriMesh::VertexHandle& _vh) const;
 };
 
 #endif // QEMSIMPLIFIER_H_

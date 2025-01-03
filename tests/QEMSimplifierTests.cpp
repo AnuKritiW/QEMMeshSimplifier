@@ -433,8 +433,9 @@ TEST(QEMSimplifier, collapseEdge)
     newPos[1] = (p1[1] + p2[1]) / 2.0;
     newPos[2] = (p1[2] + p2[2]) / 2.0;
 
+    TriMesh::VertexHandle vKeepArg;
     // Collapse the edge
-    ASSERT_TRUE(qem.collapseEdge(mesh, edge, newPos));
+    ASSERT_TRUE(qem.collapseEdge(mesh, edge, newPos, vKeepArg));
 
     // Remove deleted vertices, edges, and faces from the mesh
     mesh.garbage_collection();
@@ -490,9 +491,10 @@ TEST(QEMSimplifier, collapseEdgeNotAllowed)
     // New position for vKeep
     Eigen::Vector3d newPos(0.5, 0.0, 0.0); // Midpoint of v0 and v1
 
+    TriMesh::VertexHandle vKeep;
     // Collapse the edge
     // Should fail because only a planar triangle has been passed
-    ASSERT_FALSE(qem.collapseEdge(mesh, edge, newPos));
+    ASSERT_FALSE(qem.collapseEdge(mesh, edge, newPos, vKeep));
 
     // Validate the mesh after collapse fails
     EXPECT_EQ(mesh.n_vertices(), 3);
