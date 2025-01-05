@@ -17,6 +17,8 @@ public:
                                          const TriMesh::Point& _p1,
                                          const TriMesh::Point& _p2);
     void computeQuadricsInParallel(TriMesh& _mesh, std::vector<QMatrix>& globalQuadrics);
+    QMatrix mergeQuadrics(const TriMesh& _mesh, TriMesh::VertexHandle _v0, TriMesh::VertexHandle _v1);
+    int sumVersions(const TriMesh& _mesh, TriMesh::VertexHandle _v0, TriMesh::VertexHandle _v1);
     void computeQuadrics(TriMesh& _mesh);
     QMatrix computeFaceQuadric(TriMesh& _mesh, TriMesh::FaceHandle _face);
     void simplifyMesh(TriMesh& _mesh, size_t _tgtNumFaces);

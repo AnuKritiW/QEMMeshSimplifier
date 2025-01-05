@@ -111,6 +111,16 @@ void QEMSimplifier::computeQuadrics(TriMesh& _mesh)
     std::cout << "Time taken for computeQuadrics: " << duration.count() << " ms" << std::endl;
 }
 
+QMatrix QEMSimplifier::mergeQuadrics(const TriMesh& _mesh, TriMesh::VertexHandle _v0, TriMesh::VertexHandle _v1)
+{
+    return _mesh.property(vQuadric, _v0) + _mesh.property(vQuadric, _v1);
+}
+
+int QEMSimplifier::sumVersions(const TriMesh& _mesh, TriMesh::VertexHandle _v0, TriMesh::VertexHandle _v1)
+{
+    return _mesh.property(vVersion, _v0) + _mesh.property(vVersion, _v1);
+}
+
 float QEMSimplifier::computeEdgeCollapseCost(TriMesh& _mesh, TriMesh::EdgeHandle _edge, Eigen::Vector3d& _optPos)
 {
     // Get vert handles
@@ -119,7 +129,7 @@ float QEMSimplifier::computeEdgeCollapseCost(TriMesh& _mesh, TriMesh::EdgeHandle
     TriMesh::VertexHandle v1 = _mesh.from_vertex_handle(he0);
 
     // Sum of quadrics
-    QMatrix Q = _mesh.property(vQuadric, v0) + _mesh.property(vQuadric, v1);
+    QMatrix Q = mergeQuadrics(_mesh, v0, v1);
 
     /**
      * The goal is to minimize Error(v) = v^T * Q * v, where v is the contraction target
@@ -193,7 +203,7 @@ bool QEMSimplifier::collapseEdge(TriMesh& _mesh, TriMesh::EdgeHandle _edge, cons
     if (!_mesh.get_property_handle(vQuadric, "v:quadric")) return false;
 
     // Merge quadrics
-    QMatrix QSum = _mesh.property(vQuadric, _vKeep) + _mesh.property(vQuadric, vRemove);
+    QMatrix QSum = mergeQuadrics(_mesh, _vKeep, vRemove);
 
     // Assign to the kept vert
     _mesh.property(vQuadric, _vKeep) = QSum;
@@ -238,7 +248,7 @@ void QEMSimplifier::simplifyMesh(TriMesh& _mesh, size_t _tgtNumFaces)
         auto he0 = _mesh.halfedge_handle(*e_it, 0);
         auto v0  = _mesh.to_vertex_handle(he0);
         auto v1  = _mesh.from_vertex_handle(he0);
-        int verSum = _mesh.property(vVersion, v0) + _mesh.property(vVersion, v1);
+        int verSum = sumVersions(_mesh, v0, v1);
 
         EdgeInfo edgeInfo{*e_it, cost, optPos, verSum};
         priQ.push(edgeInfo);
@@ -257,7 +267,7 @@ void QEMSimplifier::simplifyMesh(TriMesh& _mesh, size_t _tgtNumFaces)
         TriMesh::HalfedgeHandle he0 = _mesh.halfedge_handle(top.edgeHandle, 0);
         TriMesh::VertexHandle v0    = _mesh.to_vertex_handle(he0);
         TriMesh::VertexHandle v1    = _mesh.from_vertex_handle(he0);
-        unsigned int currVerSum = _mesh.property(vVersion, v0) + _mesh.property(vVersion, v1);
+        unsigned int currVerSum = sumVersions(_mesh, v0, v1);
 
         if (currVerSum != top.versionSum) continue; // stale
 
@@ -295,7 +305,7 @@ void QEMSimplifier::simplifyMesh(TriMesh& _mesh, size_t _tgtNumFaces)
             float localCost = computeEdgeCollapseCost(_mesh, currEdge, localOptPos);
 
             // Store new version sum
-            int verSum2 = _mesh.property(vVersion, vKeep) + _mesh.property(vVersion, vNeighbor);
+            int verSum2 = sumVersions(_mesh, vKeep, vNeighbor);
 
             EdgeInfo updatedEdge{currEdge, localCost, localOptPos, verSum2};
             priQ.push(updatedEdge);
