@@ -36,32 +36,93 @@ TEST(Parser, FailToLoadInvalidMesh)
  * Tests for QEMSimplifier
 */
 
-// initializeQuadricsToZero
-// TEST(QEMSimplifier, initializeQuadricsToZero)
-// {
-//     QEMSimplifier qem;
-//     TriMesh mesh;
-//     std::string validFile = "../object-files/gourd.obj";
-//     ASSERT_TRUE(Parser::loadMesh(validFile, mesh));
+TEST(QEMSimplifierUtils, InitializePropertyInt)
+{
+    TriMesh mesh;
 
-//     static OpenMesh::VPropHandleT<QMatrix> vQuadric;
-//     if (!mesh.get_property_handle(vQuadric, "v:quadric"))
-//     {
-//         mesh.add_property(vQuadric, "v:quadric");
-//     }
+    // Add vertices to the mesh
+    auto v1 = mesh.add_vertex(TriMesh::Point(0.0, 0.0, 0.0));
+    auto v2 = mesh.add_vertex(TriMesh::Point(1.0, 0.0, 0.0));
+    auto v3 = mesh.add_vertex(TriMesh::Point(0.0, 1.0, 0.0));
 
-//     ASSERT_TRUE(mesh.get_property_handle(vQuadric, "v:quadric"));
+    // Define a property and initialize it
+    OpenMesh::VPropHandleT<int> intProperty;
+    QEMSimplifierUtils::initializeProperty(mesh, intProperty, "v:intProperty", 42);
 
-//     // Call the function
-//     qem.initializeQuadricsToZero(mesh);
+    // Ensure the property is initialized and default values are set
+    ASSERT_TRUE(mesh.get_property_handle(intProperty, "v:intProperty"));
+    EXPECT_EQ(mesh.property(intProperty, v1), 42);
+    EXPECT_EQ(mesh.property(intProperty, v2), 42);
+    EXPECT_EQ(mesh.property(intProperty, v3), 42);
+}
 
-//     // Verify all quadrics are set to zero
-//     for (auto v_it = mesh.vertices_begin(); v_it != mesh.vertices_end(); ++v_it)
-//     {
-//         QMatrix quadric = mesh.property(vQuadric, *v_it);
-//         EXPECT_TRUE(quadric.isZero());
-//     }
-// }
+TEST(QEMSimplifierUtils, InitializePropertyMatrix)
+{
+    TriMesh mesh;
+
+    // Add vertices to the mesh
+    auto v1 = mesh.add_vertex(TriMesh::Point(0.0, 0.0, 0.0));
+    auto v2 = mesh.add_vertex(TriMesh::Point(1.0, 0.0, 0.0));
+    auto v3 = mesh.add_vertex(TriMesh::Point(0.0, 1.0, 0.0));
+
+    // Define another property for testing a different type
+    OpenMesh::VPropHandleT<Eigen::Matrix4d> matrixProperty;
+    QMatrix defaultMatrix = Eigen::Matrix4d::Identity();
+    QEMSimplifierUtils::initializeProperty(mesh, matrixProperty, "v:matrixProperty", defaultMatrix);
+
+    // Ensure the property is initialized and default values are set
+    ASSERT_TRUE(mesh.get_property_handle(matrixProperty, "v:matrixProperty"));
+    EXPECT_TRUE(mesh.property(matrixProperty, v1).isApprox(defaultMatrix));
+    EXPECT_TRUE(mesh.property(matrixProperty, v2).isApprox(defaultMatrix));
+    EXPECT_TRUE(mesh.property(matrixProperty, v3).isApprox(defaultMatrix));
+}
+
+TEST(QEMSimplifierUtils, MergeVertexPropertiesInt)
+{
+    TriMesh mesh;
+
+    // Add vertices to the mesh
+    auto v1 = mesh.add_vertex(TriMesh::Point(0.0, 0.0, 0.0));
+    auto v2 = mesh.add_vertex(TriMesh::Point(1.0, 0.0, 0.0));
+
+    // Define a property and initialize it
+    OpenMesh::VPropHandleT<int> intProperty;
+    QEMSimplifierUtils::initializeProperty(mesh, intProperty, "v:intProperty", 0);
+
+    // Set custom values for the vertices
+    mesh.property(intProperty, v1) = 10;
+    mesh.property(intProperty, v2) = 20;
+
+    // Merge the properties
+    int mergedValue = QEMSimplifierUtils::mergeVertexProperties(mesh, v1, v2, intProperty);
+    EXPECT_EQ(mergedValue, 30); // 10 + 20
+}
+TEST(QEMSimplifierUtils, MergeVertexPropertiesMatrix)
+{
+    TriMesh mesh;
+
+    // Add vertices to the mesh
+    auto v1 = mesh.add_vertex(TriMesh::Point(0.0, 0.0, 0.0));
+    auto v2 = mesh.add_vertex(TriMesh::Point(1.0, 0.0, 0.0));
+
+    // Define another property for testing Eigen::Matrix4d
+    OpenMesh::VPropHandleT<Eigen::Matrix4d> matrixProperty;
+    Eigen::Matrix4d defaultMatrix = Eigen::Matrix4d::Zero();
+    QEMSimplifierUtils::initializeProperty(mesh, matrixProperty, "v:matrixProperty", defaultMatrix);
+
+    // Set custom values for the vertices
+    QMatrix matrix1 = Eigen::Matrix4d::Identity();
+    QMatrix matrix2 = Eigen::Matrix4d::Constant(1.0);
+    mesh.property(matrixProperty, v1) = matrix1;
+    mesh.property(matrixProperty, v2) = matrix2;
+
+    // Merge the properties
+    QMatrix mergedMatrix = QEMSimplifierUtils::mergeVertexProperties(mesh, v1, v2, matrixProperty);
+
+    // Verify the merged matrix
+    QMatrix expectedMatrix = matrix1 + matrix2;
+    EXPECT_TRUE(mergedMatrix.isApprox(expectedMatrix));
+}
 
 // computePlaneEquation
 TEST(QEMSimplifierUtils, computePlaneEquation)
