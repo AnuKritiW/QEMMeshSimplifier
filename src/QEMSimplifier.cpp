@@ -85,6 +85,14 @@ void QEMSimplifier::computeQuadrics(TriMesh& _mesh)
     initializeQuadricsToZero(_mesh);
     initializeVersionstoZero(_mesh);
 
+    // Store face handles in a temporary structure for parallelization
+    std::vector<TriMesh::FaceHandle> faceHandles;
+    faceHandles.reserve(_mesh.n_faces());
+    for (auto f_it = _mesh.faces_begin(); f_it != _mesh.faces_end(); ++f_it)
+    {
+        faceHandles.push_back(*f_it);
+    }
+
     // Enable parallelization
     #pragma omp parallel
     {
@@ -94,16 +102,15 @@ void QEMSimplifier::computeQuadrics(TriMesh& _mesh)
         #pragma omp for
         for (int i = 0; i < _mesh.n_faces(); ++i)
         {
-            auto f_it = _mesh.faces_begin() + i;
-            if (f_it->is_valid())
-            {
-                QMatrix Kp = computeFaceQuadric(_mesh, *f_it);
+            TriMesh::FaceHandle fh = faceHandles[i];
+            if (!fh.is_valid()) continue;
 
-                for (auto fv_it = _mesh.fv_iter(*f_it); fv_it.is_valid(); ++fv_it)
-                {
-                    size_t vertexIdx = fv_it->idx();
-                    localQuadrics[vertexIdx] += Kp; // Accumulate locally
-                }
+            QMatrix Kp = computeFaceQuadric(_mesh, fh);
+
+            for (auto fv_it = _mesh.fv_iter(fh); fv_it.is_valid(); ++fv_it)
+            {
+                size_t vertexIdx = fv_it->idx();
+                localQuadrics[vertexIdx] += Kp; // Accumulate locally
             }
         }
 
