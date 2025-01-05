@@ -51,40 +51,14 @@ QMatrix QEMSimplifier::computeFaceQuadric(TriMesh& _mesh, TriMesh::FaceHandle _f
     return (plane * plane.transpose());
 }
 
-void QEMSimplifier::initializeQuadricsToZero(TriMesh& _mesh)
-{
-    if (!_mesh.get_property_handle(vQuadric, "v:quadric"))
-    {
-        _mesh.add_property(vQuadric, "v:quadric");
-
-        // Initialize quadrics to zero for all vertices
-        for (auto v_it = _mesh.vertices_begin(); v_it != _mesh.vertices_end(); ++v_it)
-        {
-            _mesh.property(vQuadric, *v_it) = QMatrix::Zero();
-        }
-    }
-}
-
-void QEMSimplifier::initializeVersionstoZero(TriMesh& _mesh)
-{
-    if (!_mesh.get_property_handle(vVersion, "v:version"))
-    {
-        _mesh.add_property(vVersion, "v:version");
-        for (auto v_it = _mesh.vertices_begin(); v_it != _mesh.vertices_end(); ++v_it)
-        {
-            _mesh.property(vVersion, *v_it) = 0; // initialize to zero
-        }
-    }
-}
-
 void QEMSimplifier::computeQuadrics(TriMesh& _mesh)
 {
     // TODO: delete
     // Benchmark for parallelization
     auto start = std::chrono::high_resolution_clock::now(); // Start timer
 
-    initializeQuadricsToZero(_mesh);
-    initializeVersionstoZero(_mesh);
+    initializeProperty(_mesh, vQuadric, "v:quadric", QMatrix::Zero().eval());
+    initializeProperty(_mesh, vVersion, "v:version", 0);
 
     // Store face handles in a temporary structure for parallelization
     std::vector<TriMesh::FaceHandle> faceHandles;
@@ -222,10 +196,8 @@ bool QEMSimplifier::collapseEdge(TriMesh& _mesh, TriMesh::EdgeHandle _edge, cons
     // Move kept vert to the new position
     _mesh.set_point(_vKeep, TriMesh::Point((float)_newPos[0], (float)_newPos[1], (float)_newPos[2]));
 
-    if (_mesh.get_property_handle(vVersion, "v:version"))
-    {
-        _mesh.property(vVersion, _vKeep)++;
-    }
+    if (!_mesh.get_property_handle(vVersion, "v:version")) return false;
+    _mesh.property(vVersion, _vKeep)++;
 
     // If OpenMesh forbids collapse due to topological constraints, skip
     if (!_mesh.is_collapse_ok(he0)) return false;

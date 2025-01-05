@@ -36,31 +36,31 @@ TEST(Parser, FailToLoadInvalidMesh)
 */
 
 // initializeQuadricsToZero
-TEST(QEMSimplifier, initializeQuadricsToZero)
-{
-    QEMSimplifier qem;
-    TriMesh mesh;
-    std::string validFile = "../object-files/gourd.obj";
-    ASSERT_TRUE(Parser::loadMesh(validFile, mesh));
+// TEST(QEMSimplifier, initializeQuadricsToZero)
+// {
+//     QEMSimplifier qem;
+//     TriMesh mesh;
+//     std::string validFile = "../object-files/gourd.obj";
+//     ASSERT_TRUE(Parser::loadMesh(validFile, mesh));
 
-    static OpenMesh::VPropHandleT<QMatrix> vQuadric;
-    if (!mesh.get_property_handle(vQuadric, "v:quadric"))
-    {
-        mesh.add_property(vQuadric, "v:quadric");
-    }
+//     static OpenMesh::VPropHandleT<QMatrix> vQuadric;
+//     if (!mesh.get_property_handle(vQuadric, "v:quadric"))
+//     {
+//         mesh.add_property(vQuadric, "v:quadric");
+//     }
 
-    ASSERT_TRUE(mesh.get_property_handle(vQuadric, "v:quadric"));
+//     ASSERT_TRUE(mesh.get_property_handle(vQuadric, "v:quadric"));
 
-    // Call the function
-    qem.initializeQuadricsToZero(mesh);
+//     // Call the function
+//     qem.initializeQuadricsToZero(mesh);
 
-    // Verify all quadrics are set to zero
-    for (auto v_it = mesh.vertices_begin(); v_it != mesh.vertices_end(); ++v_it)
-    {
-        QMatrix quadric = mesh.property(vQuadric, *v_it);
-        EXPECT_TRUE(quadric.isZero());
-    }
-}
+//     // Verify all quadrics are set to zero
+//     for (auto v_it = mesh.vertices_begin(); v_it != mesh.vertices_end(); ++v_it)
+//     {
+//         QMatrix quadric = mesh.property(vQuadric, *v_it);
+//         EXPECT_TRUE(quadric.isZero());
+//     }
+// }
 
 // computePlaneEquation
 TEST(QEMSimplifier, computePlaneEquation)

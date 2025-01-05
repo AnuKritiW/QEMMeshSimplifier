@@ -18,8 +18,6 @@ public:
                                          const TriMesh::Point& _p2);
     void computeQuadrics(TriMesh& _mesh);
     QMatrix computeFaceQuadric(TriMesh& _mesh, TriMesh::FaceHandle _face);
-    void initializeQuadricsToZero(TriMesh& _mesh);
-    void initializeVersionstoZero(TriMesh& _mesh);
     void simplifyMesh(TriMesh& _mesh, size_t _tgtNumFaces);
     float computeEdgeCollapseCost(TriMesh& _mesh, TriMesh::EdgeHandle _edge, Eigen::Vector3d& _optPos);
     bool collapseEdge(TriMesh& _mesh, TriMesh::EdgeHandle _edge, const Eigen::Vector3d& _newPos, TriMesh::VertexHandle& _vKeep);
@@ -38,6 +36,21 @@ public:
     };
 
     QMatrix& getVertexQuadric(TriMesh& _mesh, const TriMesh::VertexHandle& _vh) const;
+
+    // Template utility for property initialization
+    template <typename T>
+    void initializeProperty(TriMesh& _mesh, OpenMesh::VPropHandleT<T>& property, const std::string& name, const T& defaultValue)
+    {
+        if (!_mesh.get_property_handle(property, name))
+        {
+            _mesh.add_property(property, name);
+            for (auto v_it = _mesh.vertices_begin(); v_it != _mesh.vertices_end(); ++v_it)
+            {
+                _mesh.property(property, *v_it) = defaultValue;
+            }
+        }
+    }
+
 };
 
 #endif // QEMSIMPLIFIER_H_
