@@ -221,6 +221,53 @@ bool QEMSimplifier::collapseEdge(TriMesh& _mesh, TriMesh::EdgeHandle _edge, cons
     return true;
 }
 
+void QEMSimplifier::recalculateEdgeCosts(TriMesh& _mesh,
+                                         TriMesh::VertexHandle _vKeep,
+                                         std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>>& _priQ)
+{
+    for (auto vv_it = _mesh.vv_iter(_vKeep); vv_it.is_valid(); ++vv_it)
+    {
+        TriMesh::VertexHandle vNeighbor = *vv_it;
+
+        TriMesh::HalfedgeHandle currHe = _mesh.find_halfedge(_vKeep, vNeighbor);
+        if (!currHe.is_valid()) continue;
+
+        TriMesh::EdgeHandle currEdge = _mesh.edge_handle(currHe);
+        if (!currEdge.is_valid() || _mesh.status(currEdge).deleted()) continue;
+
+        // Recompute cost
+        Eigen::Vector3d localOptPos;
+        float localCost = computeEdgeCollapseCost(_mesh, currEdge, localOptPos);
+
+        // Store new version sum
+        int verSum2 = sumVersions(_mesh, _vKeep, vNeighbor);
+
+        EdgeInfo updatedEdge{currEdge, localCost, localOptPos, verSum2};
+        _priQ.push(updatedEdge);
+    }
+}
+
+void QEMSimplifier::initializePriorityQueue(TriMesh& _mesh,
+                                            std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>>& _priQ)
+{
+    // for every edge, compute the cost and the new pos
+    for (auto e_it = _mesh.edges_begin(); e_it != _mesh.edges_end(); ++e_it)
+    {
+        if (_mesh.status(*e_it).deleted()) continue;
+
+        Eigen::Vector3d optPos; // optimal position
+        float cost = computeEdgeCollapseCost(_mesh, *e_it, optPos);
+
+        auto he0 = _mesh.halfedge_handle(*e_it, 0);
+        auto v0  = _mesh.to_vertex_handle(he0);
+        auto v1  = _mesh.from_vertex_handle(he0);
+        int verSum = sumVersions(_mesh, v0, v1);
+
+        EdgeInfo edgeInfo{*e_it, cost, optPos, verSum};
+        _priQ.push(edgeInfo);
+    }
+}
+
 void QEMSimplifier::simplifyMesh(TriMesh& _mesh, size_t _tgtNumFaces)
 {
     computeQuadrics(_mesh);
@@ -236,23 +283,7 @@ void QEMSimplifier::simplifyMesh(TriMesh& _mesh, size_t _tgtNumFaces)
     // Build the initial priority queue of edges
     // the one with the lowest cost is always at the top (min-heap)
     std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>> priQ;
-
-    // for every edge, compute the cost and the new pos
-    for (auto e_it = _mesh.edges_begin(); e_it != _mesh.edges_end(); ++e_it)
-    {
-        if (_mesh.status(*e_it).deleted()) continue;
-
-        Eigen::Vector3d optPos; // optimal position
-        float cost = computeEdgeCollapseCost(_mesh, *e_it, optPos);
-
-        auto he0 = _mesh.halfedge_handle(*e_it, 0);
-        auto v0  = _mesh.to_vertex_handle(he0);
-        auto v1  = _mesh.from_vertex_handle(he0);
-        int verSum = sumVersions(_mesh, v0, v1);
-
-        EdgeInfo edgeInfo{*e_it, cost, optPos, verSum};
-        priQ.push(edgeInfo);
-    }
+    initializePriorityQueue(_mesh, priQ);
 
     // TODO: add test for negative faces for numFaces and tgtNumFaces
     unsigned int numFaces = _mesh.n_faces();
@@ -290,26 +321,7 @@ void QEMSimplifier::simplifyMesh(TriMesh& _mesh, size_t _tgtNumFaces)
             numFaces--;
         }
 
-        for (auto vv_it = _mesh.vv_iter(vKeep); vv_it.is_valid(); ++vv_it)
-        {
-            TriMesh::VertexHandle vNeighbor = *vv_it;
-
-            TriMesh::HalfedgeHandle currHe = _mesh.find_halfedge(vKeep, vNeighbor);
-            if (!currHe.is_valid()) continue;
-
-            TriMesh::EdgeHandle currEdge = _mesh.edge_handle(currHe);
-            if (!currEdge.is_valid() || _mesh.status(currEdge).deleted()) continue;
-
-            // Recompute cost
-            Eigen::Vector3d localOptPos;
-            float localCost = computeEdgeCollapseCost(_mesh, currEdge, localOptPos);
-
-            // Store new version sum
-            int verSum2 = sumVersions(_mesh, vKeep, vNeighbor);
-
-            EdgeInfo updatedEdge{currEdge, localCost, localOptPos, verSum2};
-            priQ.push(updatedEdge);
-        }
+        recalculateEdgeCosts(_mesh, vKeep, priQ);
     }
 
     // Clean up

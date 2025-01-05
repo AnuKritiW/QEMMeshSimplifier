@@ -13,18 +13,6 @@ class QEMSimplifier
 public:
     QEMSimplifier(); // Constructor
 
-    Eigen::Vector4d computePlaneEquation(const TriMesh::Point& _p0,
-                                         const TriMesh::Point& _p1,
-                                         const TriMesh::Point& _p2);
-    void computeQuadricsInParallel(TriMesh& _mesh, std::vector<QMatrix>& globalQuadrics);
-    QMatrix mergeQuadrics(const TriMesh& _mesh, TriMesh::VertexHandle _v0, TriMesh::VertexHandle _v1);
-    int sumVersions(const TriMesh& _mesh, TriMesh::VertexHandle _v0, TriMesh::VertexHandle _v1);
-    void computeQuadrics(TriMesh& _mesh);
-    QMatrix computeFaceQuadric(TriMesh& _mesh, TriMesh::FaceHandle _face);
-    void simplifyMesh(TriMesh& _mesh, size_t _tgtNumFaces);
-    float computeEdgeCollapseCost(TriMesh& _mesh, TriMesh::EdgeHandle _edge, Eigen::Vector3d& _optPos);
-    bool collapseEdge(TriMesh& _mesh, TriMesh::EdgeHandle _edge, const Eigen::Vector3d& _newPos, TriMesh::VertexHandle& _vKeep);
-
     struct EdgeInfo
     {
         TriMesh::EdgeHandle edgeHandle;
@@ -37,6 +25,23 @@ public:
             return cost > rhs.cost;
         }
     };
+
+    Eigen::Vector4d computePlaneEquation(const TriMesh::Point& _p0,
+                                         const TriMesh::Point& _p1,
+                                         const TriMesh::Point& _p2);
+    void computeQuadricsInParallel(TriMesh& _mesh, std::vector<QMatrix>& globalQuadrics);
+    QMatrix mergeQuadrics(const TriMesh& _mesh, TriMesh::VertexHandle _v0, TriMesh::VertexHandle _v1);
+    int sumVersions(const TriMesh& _mesh, TriMesh::VertexHandle _v0, TriMesh::VertexHandle _v1);
+    void computeQuadrics(TriMesh& _mesh);
+    QMatrix computeFaceQuadric(TriMesh& _mesh, TriMesh::FaceHandle _face);
+    void recalculateEdgeCosts(TriMesh& _mesh,
+                              TriMesh::VertexHandle _vKeep,
+                              std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>>& _priQ);
+    void initializePriorityQueue(TriMesh& _mesh,
+                                 std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>>& _priQ);
+    void simplifyMesh(TriMesh& _mesh, size_t _tgtNumFaces);
+    float computeEdgeCollapseCost(TriMesh& _mesh, TriMesh::EdgeHandle _edge, Eigen::Vector3d& _optPos);
+    bool collapseEdge(TriMesh& _mesh, TriMesh::EdgeHandle _edge, const Eigen::Vector3d& _newPos, TriMesh::VertexHandle& _vKeep);
 
     QMatrix& getVertexQuadric(TriMesh& _mesh, const TriMesh::VertexHandle& _vh) const;
 
