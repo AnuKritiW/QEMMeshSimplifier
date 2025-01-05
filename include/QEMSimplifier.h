@@ -16,6 +16,7 @@ public:
     Eigen::Vector4d computePlaneEquation(const TriMesh::Point& _p0,
                                          const TriMesh::Point& _p1,
                                          const TriMesh::Point& _p2);
+    void computeQuadricsInParallel(TriMesh& _mesh, std::vector<QMatrix>& globalQuadrics);
     void computeQuadrics(TriMesh& _mesh);
     QMatrix computeFaceQuadric(TriMesh& _mesh, TriMesh::FaceHandle _face);
     void simplifyMesh(TriMesh& _mesh, size_t _tgtNumFaces);

@@ -51,15 +51,8 @@ QMatrix QEMSimplifier::computeFaceQuadric(TriMesh& _mesh, TriMesh::FaceHandle _f
     return (plane * plane.transpose());
 }
 
-void QEMSimplifier::computeQuadrics(TriMesh& _mesh)
+void QEMSimplifier::computeQuadricsInParallel(TriMesh& _mesh, std::vector<QMatrix>& globalQuadrics)
 {
-    // TODO: delete
-    // Benchmark for parallelization
-    auto start = std::chrono::high_resolution_clock::now(); // Start timer
-
-    initializeProperty(_mesh, vQuadric, "v:quadric", QMatrix::Zero().eval());
-    initializeProperty(_mesh, vVersion, "v:version", 0);
-
     // Store face handles in a temporary structure for parallelization
     std::vector<TriMesh::FaceHandle> faceHandles;
     faceHandles.reserve(_mesh.n_faces());
@@ -67,9 +60,6 @@ void QEMSimplifier::computeQuadrics(TriMesh& _mesh)
     {
         faceHandles.push_back(*f_it);
     }
-
-    // Allocate global storage for reduction
-    std::vector<QMatrix> globalQuadrics(_mesh.n_vertices(), QMatrix::Zero());
 
     // Enable parallelization
 
@@ -92,9 +82,24 @@ void QEMSimplifier::computeQuadrics(TriMesh& _mesh)
             globalQuadrics[vertexIdx] += Kp; // Accumulate locally
         }
     }
+}
+
+void QEMSimplifier::computeQuadrics(TriMesh& _mesh)
+{
+    // TODO: delete
+    // Benchmark for parallelization
+    auto start = std::chrono::high_resolution_clock::now(); // Start timer
+
+    initializeProperty(_mesh, vQuadric, "v:quadric", QMatrix::Zero().eval());
+    initializeProperty(_mesh, vVersion, "v:version", 0);
+
+    // Allocate global storage for reduction
+    std::vector<QMatrix> globalQuadrics(_mesh.n_vertices(), QMatrix::Zero());
+    computeQuadricsInParallel(_mesh, globalQuadrics);
 
     // Update mesh properties in a single-threaded step
-    for (size_t v_idx = 0; v_idx < _mesh.n_vertices(); ++v_idx) {
+    for (size_t v_idx = 0; v_idx < _mesh.n_vertices(); ++v_idx)
+    {
         _mesh.property(vQuadric, TriMesh::VertexHandle(v_idx)) = globalQuadrics[v_idx];
     }
 
