@@ -1,6 +1,6 @@
 #include "QEMSimplifier.h"
 #include <queue>
-#include <chrono>
+#include <chrono> // TODO: deleteq
 
 static OpenMesh::VPropHandleT<Eigen::Matrix4d> vQuadric;
 static OpenMesh::VPropHandleT<int> vVersion;
@@ -79,6 +79,7 @@ void QEMSimplifier::initializeVersionstoZero(TriMesh& _mesh)
 
 void QEMSimplifier::computeQuadrics(TriMesh& _mesh)
 {
+    // TODO: delete
     // Benchmark for parallelization
     auto start = std::chrono::high_resolution_clock::now(); // Start timer
 
@@ -93,36 +94,37 @@ void QEMSimplifier::computeQuadrics(TriMesh& _mesh)
         faceHandles.push_back(*f_it);
     }
 
+    // Allocate global storage for reduction
+    std::vector<QMatrix> globalQuadrics(_mesh.n_vertices(), QMatrix::Zero());
+
     // Enable parallelization
-    #pragma omp parallel
+
+    /**
+     * Create a private copy of globalQuadrics for each thread.
+     * Perform independent computations in parallel for each thread.
+     * Combine the results at the end into the shared globalQuadrics array.
+     */
+    #pragma omp parallel for reduction(+: globalQuadrics[:_mesh.n_vertices()])
+    for (int i = 0; i < _mesh.n_faces(); ++i)
     {
-        // Each thread gets its own temporary storage
-        std::vector<QMatrix> localQuadrics(_mesh.n_vertices(), QMatrix::Zero());
+        TriMesh::FaceHandle fh = faceHandles[i];
+        if (!fh.is_valid()) continue;
 
-        #pragma omp for
-        for (int i = 0; i < _mesh.n_faces(); ++i)
+        QMatrix Kp = computeFaceQuadric(_mesh, fh);
+
+        for (auto fv_it = _mesh.fv_iter(fh); fv_it.is_valid(); ++fv_it)
         {
-            TriMesh::FaceHandle fh = faceHandles[i];
-            if (!fh.is_valid()) continue;
-
-            QMatrix Kp = computeFaceQuadric(_mesh, fh);
-
-            for (auto fv_it = _mesh.fv_iter(fh); fv_it.is_valid(); ++fv_it)
-            {
-                size_t vertexIdx = fv_it->idx();
-                localQuadrics[vertexIdx] += Kp; // Accumulate locally
-            }
-        }
-
-        // Combine results from all threads
-        #pragma omp critical
-        {
-            for (size_t v_idx = 0; v_idx < _mesh.n_vertices(); ++v_idx) {
-                _mesh.property(vQuadric, TriMesh::VertexHandle(v_idx)) += localQuadrics[v_idx];
-            }
+            size_t vertexIdx = fv_it->idx();
+            globalQuadrics[vertexIdx] += Kp; // Accumulate locally
         }
     }
 
+    // Update mesh properties in a single-threaded step
+    for (size_t v_idx = 0; v_idx < _mesh.n_vertices(); ++v_idx) {
+        _mesh.property(vQuadric, TriMesh::VertexHandle(v_idx)) = globalQuadrics[v_idx];
+    }
+
+    // TODO: delete
     // Benchmark for parallelization
     auto end = std::chrono::high_resolution_clock::now(); // End timer
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
