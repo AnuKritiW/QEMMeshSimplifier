@@ -36,6 +36,27 @@ void QEMSimplifier::computeQuadrics(TriMesh& _mesh)
     std::cout << "Time taken for computeQuadrics: " << duration.count() << " ms" << std::endl;
 }
 
+void QEMSimplifier::initializePriorityQueue(TriMesh& _mesh,
+                                            std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>>& _priQ)
+{
+    // for every edge, compute the cost and the new pos
+    for (auto e_it = _mesh.edges_begin(); e_it != _mesh.edges_end(); ++e_it)
+    {
+        if (_mesh.status(*e_it).deleted()) continue;
+
+        Eigen::Vector3d optPos; // optimal position
+        float cost = QEMSimplifierUtils::computeEdgeCollapseCost(_mesh, *e_it, optPos);
+
+        auto he0 = _mesh.halfedge_handle(*e_it, 0);
+        auto v0  = _mesh.to_vertex_handle(he0);
+        auto v1  = _mesh.from_vertex_handle(he0);
+        int verSum = QEMSimplifierUtils::mergeVertexProperties(_mesh, v0, v1, vVersion);
+
+        EdgeInfo edgeInfo{*e_it, cost, optPos, verSum};
+        _priQ.push(edgeInfo);
+    }
+}
+
 // Collapse an edge with a known new vertex position
 // * Merges quadrics
 // * Moves the final vertex
@@ -76,7 +97,7 @@ bool QEMSimplifier::collapseEdge(TriMesh& _mesh, TriMesh::EdgeHandle _edge, cons
 
 void QEMSimplifier::recalculateEdgeCosts(TriMesh& _mesh,
                                          TriMesh::VertexHandle _vKeep,
-                                         std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>>& _priQ)
+                                         std::priority_queue<EdgeInfo,std::vector<EdgeInfo>, std::greater<EdgeInfo>>& _priQ)
 {
     for (auto vv_it = _mesh.vv_iter(_vKeep); vv_it.is_valid(); ++vv_it)
     {
@@ -97,27 +118,6 @@ void QEMSimplifier::recalculateEdgeCosts(TriMesh& _mesh,
 
         EdgeInfo updatedEdge{currEdge, localCost, localOptPos, verSum2};
         _priQ.push(updatedEdge);
-    }
-}
-
-void QEMSimplifier::initializePriorityQueue(TriMesh& _mesh,
-                                            std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>>& _priQ)
-{
-    // for every edge, compute the cost and the new pos
-    for (auto e_it = _mesh.edges_begin(); e_it != _mesh.edges_end(); ++e_it)
-    {
-        if (_mesh.status(*e_it).deleted()) continue;
-
-        Eigen::Vector3d optPos; // optimal position
-        float cost = QEMSimplifierUtils::computeEdgeCollapseCost(_mesh, *e_it, optPos);
-
-        auto he0 = _mesh.halfedge_handle(*e_it, 0);
-        auto v0  = _mesh.to_vertex_handle(he0);
-        auto v1  = _mesh.from_vertex_handle(he0);
-        int verSum = QEMSimplifierUtils::mergeVertexProperties(_mesh, v0, v1, vVersion);
-
-        EdgeInfo edgeInfo{*e_it, cost, optPos, verSum};
-        _priQ.push(edgeInfo);
     }
 }
 

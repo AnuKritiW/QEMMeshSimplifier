@@ -40,18 +40,9 @@ public:
     static float computeEdgeCollapseCost(TriMesh& _mesh, TriMesh::EdgeHandle _edge, Eigen::Vector3d& _optPos);
 
     // getters
-    static OpenMesh::VPropHandleT<Eigen::Matrix4d>& getQuadricHandle() {
-        return vQuadric;
-    }
-
-    static OpenMesh::VPropHandleT<int>& getVersionHandle() {
-        return vVersion;
-    }
-
-    static QMatrix& getVertexQuadric(TriMesh& _mesh, const TriMesh::VertexHandle& _vh)
-    {
-        return _mesh.property(vQuadric, _vh);
-    }
+    static OpenMesh::VPropHandleT<Eigen::Matrix4d>& getQuadricHandle();
+    static OpenMesh::VPropHandleT<int>& getVersionHandle();
+    static QMatrix& getVertexQuadric(TriMesh& _mesh, const TriMesh::VertexHandle& _vh);
 
 private:
     static OpenMesh::VPropHandleT<Eigen::Matrix4d> vQuadric;

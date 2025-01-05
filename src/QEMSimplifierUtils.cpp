@@ -135,3 +135,18 @@ float QEMSimplifierUtils::computeEdgeCollapseCost(TriMesh& _mesh, TriMesh::EdgeH
 
     return cost;    // collapse cost
 }
+
+OpenMesh::VPropHandleT<Eigen::Matrix4d>& QEMSimplifierUtils::getQuadricHandle()
+{
+    return vQuadric;
+}
+
+OpenMesh::VPropHandleT<int>& QEMSimplifierUtils::getVersionHandle()
+{
+    return vVersion;
+}
+
+QMatrix& QEMSimplifierUtils::getVertexQuadric(TriMesh& _mesh, const TriMesh::VertexHandle& _vh)
+{
+    return _mesh.property(vQuadric, _vh);
+}
