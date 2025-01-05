@@ -2,6 +2,7 @@
 
 #include "parser.h"
 #include "QEMSimplifier.h"
+#include "QEMSimplifierUtils.h"
 
 constexpr float g_tolerance = 1e-6;
 
@@ -63,7 +64,7 @@ TEST(Parser, FailToLoadInvalidMesh)
 // }
 
 // computePlaneEquation
-TEST(QEMSimplifier, computePlaneEquation)
+TEST(QEMSimplifierUtils, computePlaneEquation)
 {
     /*
     Input: A triangle lying in the XY plane ((0,0,0), (1,0,0), (0,1,0))
@@ -71,14 +72,12 @@ TEST(QEMSimplifier, computePlaneEquation)
                      So, a = 0, b = 0, c = 1, d = 0
     */
 
-    QEMSimplifier qem;
-
     // Triangle vertices in the XY plane
     TriMesh::Point p0(0, 0, 0);
     TriMesh::Point p1(1, 0, 0);
     TriMesh::Point p2(0, 1, 0);
 
-    Eigen::Vector4d plane = qem.computePlaneEquation(p0, p1, p2);
+    Eigen::Vector4d plane = QEMSimplifierUtils::computePlaneEquation(p0, p1, p2);
 
     EXPECT_FLOAT_EQ(plane[0], 0.0); // a = 0
     EXPECT_FLOAT_EQ(plane[1], 0.0); // b = 0
@@ -87,7 +86,7 @@ TEST(QEMSimplifier, computePlaneEquation)
 }
 
 // computePlaneEquation
-TEST(QEMSimplifier, computePlaneEquationTranslatedZ)
+TEST(QEMSimplifierUtils, computePlaneEquationTranslatedZ)
 {
     /*
     Input: A triangle parallel to the XY plane but shifted in the Z direction ((0,0,1), (1,0,1), (0,1,1))
@@ -95,14 +94,12 @@ TEST(QEMSimplifier, computePlaneEquationTranslatedZ)
                      So, a = 0, b = 0, c = 1, d = -1
     */
 
-    QEMSimplifier qem;
-
     // Triangle vertices in the XY plane
     TriMesh::Point p0(0, 0, 1);
     TriMesh::Point p1(1, 0, 1);
     TriMesh::Point p2(0, 1, 1);
 
-    Eigen::Vector4d plane = qem.computePlaneEquation(p0, p1, p2);
+    Eigen::Vector4d plane = QEMSimplifierUtils::computePlaneEquation(p0, p1, p2);
 
     EXPECT_FLOAT_EQ(plane[0], 0.0);     // a = 0
     EXPECT_FLOAT_EQ(plane[1], 0.0);     // b = 0
@@ -111,14 +108,12 @@ TEST(QEMSimplifier, computePlaneEquationTranslatedZ)
 }
 
 // computePlaneEquation
-TEST(QEMSimplifier, computePlaneEquationRandomTri)
+TEST(QEMSimplifierUtils, computePlaneEquationRandomTri)
 {
     /*
     Input: A triangle that is not aligned with any axis
     Expected Output: Commented inline below
     */
-
-    QEMSimplifier qem;
 
     // Triangle vertices in the XY plane
     TriMesh::Point p0(0, 0, 0);
@@ -135,7 +130,7 @@ TEST(QEMSimplifier, computePlaneEquationRandomTri)
      */
 
 
-    Eigen::Vector4d plane = qem.computePlaneEquation(p0, p1, p2);
+    Eigen::Vector4d plane = QEMSimplifierUtils::computePlaneEquation(p0, p1, p2);
 
     const float c = (1.0 / std::sqrt(2.0));
     const float b = -c;
@@ -149,9 +144,8 @@ TEST(QEMSimplifier, computePlaneEquationRandomTri)
 }
 
 // computeFaceQuadric
-TEST(QEMSimplifier, computeFaceQuadricKnownTriangle)
+TEST(QEMSimplifierUtils, computeFaceQuadricKnownTriangle)
 {
-    QEMSimplifier qem;
     TriMesh mesh;
 
     // Create a triangle in the XY plane
@@ -160,7 +154,7 @@ TEST(QEMSimplifier, computeFaceQuadricKnownTriangle)
     TriMesh::VertexHandle v2 = mesh.add_vertex(TriMesh::Point(0, 1, 0));
     TriMesh::FaceHandle fh = mesh.add_face(v0, v1, v2);
 
-    QMatrix quadric = qem.computeFaceQuadric(mesh, fh);
+    QMatrix quadric = QEMSimplifierUtils::computeFaceQuadric(mesh, fh);
 
     QMatrix expectedQuadric;
     expectedQuadric.setZero();
@@ -169,9 +163,8 @@ TEST(QEMSimplifier, computeFaceQuadricKnownTriangle)
     EXPECT_TRUE(quadric.isApprox(expectedQuadric, 1e-6));
 }
 
-TEST(QEMSimplifier, computeFaceQuadricArbitraryTriangle)
+TEST(QEMSimplifierUtils, computeFaceQuadricArbitraryTriangle)
 {
-    QEMSimplifier qem;
     TriMesh mesh;
 
     // Create a triangle on an arbitrary plane
@@ -180,10 +173,10 @@ TEST(QEMSimplifier, computeFaceQuadricArbitraryTriangle)
     TriMesh::VertexHandle v2 = mesh.add_vertex(TriMesh::Point(0, 1, 1));
     TriMesh::FaceHandle fh = mesh.add_face(v0, v1, v2);
 
-    QMatrix quadric = qem.computeFaceQuadric(mesh, fh);
+    QMatrix quadric = QEMSimplifierUtils::computeFaceQuadric(mesh, fh);
 
     // Plane equation: computed dynamically
-    Eigen::Vector4d plane = qem.computePlaneEquation(
+    Eigen::Vector4d plane = QEMSimplifierUtils::computePlaneEquation(
         mesh.point(v0), mesh.point(v1), mesh.point(v2));
 
     float a = plane[0];
@@ -279,21 +272,21 @@ TEST(QEMSimplifier, computeEdgeCollapseCostFromObj)
     // Validate quadrics are non-zero
     for (auto v_it = mesh.vertices_begin(); v_it != mesh.vertices_end(); ++v_it)
     {
-        ASSERT_FALSE(qem.getVertexQuadric(mesh, *v_it).isZero());
+        ASSERT_FALSE(QEMSimplifierUtils::getVertexQuadric(mesh, *v_it).isZero());
     }
 
     // Iterate through edges and compute collapse cost
     for (auto e_it = mesh.edges_begin(); e_it != mesh.edges_end(); ++e_it)
     {
         Eigen::Vector3d optPos;
-        float cost = qem.computeEdgeCollapseCost(mesh, *e_it, optPos);
+        float cost = QEMSimplifierUtils::computeEdgeCollapseCost(mesh, *e_it, optPos);
 
         // Retrieve vertex handles for the edge
         auto he = mesh.halfedge_handle(*e_it, 0);
         TriMesh::VertexHandle v0 = mesh.to_vertex_handle(he);
         TriMesh::VertexHandle v1 = mesh.from_vertex_handle(he);
 
-        QMatrix Q = qem.getVertexQuadric(mesh, v0) + qem.getVertexQuadric(mesh, v1);
+        QMatrix Q = QEMSimplifierUtils::getVertexQuadric(mesh, v0) + QEMSimplifierUtils::getVertexQuadric(mesh, v1);
 
         // Note that there is duplication of logic here from the function, so the calculations are not fully independent
         // What's being tested here is that we are not entering the fallback logic in this test
@@ -332,12 +325,12 @@ TEST(QEMSimplifier, ComputeEdgeCollapseCostFallback) // Hits fallback for A
 
     for (auto v_it = mesh.vertices_begin(); v_it != mesh.vertices_end(); ++v_it)
     {
-        ASSERT_FALSE(qem.getVertexQuadric(mesh, *v_it).isZero());
+        ASSERT_FALSE(QEMSimplifierUtils::getVertexQuadric(mesh, *v_it).isZero());
     }
 
     auto edge = *mesh.edges_begin(); // Get the first edge in the mesh
     Eigen::Vector3d optPos;
-    float cost = qem.computeEdgeCollapseCost(mesh, edge, optPos);
+    float cost = QEMSimplifierUtils::computeEdgeCollapseCost(mesh, edge, optPos);
 
     EXPECT_NEAR(optPos[0], 0.5, g_tolerance); // Midpoint x-coordinate
     EXPECT_NEAR(optPos[1], 0.0, g_tolerance); // Midpoint y-coordinate
@@ -385,16 +378,16 @@ TEST(QEMSimplifier, collapseEdge)
     qem.computeQuadrics(mesh);
 
     // Ensure quadrics are initialized
-    ASSERT_FALSE(qem.getVertexQuadric(mesh, v1).isZero());
-    ASSERT_FALSE(qem.getVertexQuadric(mesh, v2).isZero());
-    ASSERT_FALSE(qem.getVertexQuadric(mesh, v3).isZero());
-    ASSERT_FALSE(qem.getVertexQuadric(mesh, v4).isZero());
-    ASSERT_FALSE(qem.getVertexQuadric(mesh, v5).isZero());
-    ASSERT_FALSE(qem.getVertexQuadric(mesh, v6).isZero());
-    ASSERT_FALSE(qem.getVertexQuadric(mesh, v7).isZero());
-    ASSERT_FALSE(qem.getVertexQuadric(mesh, v8).isZero());
-    ASSERT_FALSE(qem.getVertexQuadric(mesh, v9).isZero());
-    ASSERT_FALSE(qem.getVertexQuadric(mesh, v10).isZero());
+    ASSERT_FALSE(QEMSimplifierUtils::getVertexQuadric(mesh, v1).isZero());
+    ASSERT_FALSE(QEMSimplifierUtils::getVertexQuadric(mesh, v2).isZero());
+    ASSERT_FALSE(QEMSimplifierUtils::getVertexQuadric(mesh, v3).isZero());
+    ASSERT_FALSE(QEMSimplifierUtils::getVertexQuadric(mesh, v4).isZero());
+    ASSERT_FALSE(QEMSimplifierUtils::getVertexQuadric(mesh, v5).isZero());
+    ASSERT_FALSE(QEMSimplifierUtils::getVertexQuadric(mesh, v6).isZero());
+    ASSERT_FALSE(QEMSimplifierUtils::getVertexQuadric(mesh, v7).isZero());
+    ASSERT_FALSE(QEMSimplifierUtils::getVertexQuadric(mesh, v8).isZero());
+    ASSERT_FALSE(QEMSimplifierUtils::getVertexQuadric(mesh, v9).isZero());
+    ASSERT_FALSE(QEMSimplifierUtils::getVertexQuadric(mesh, v10).isZero());
 
     // Request necessary status flags
     // needed for is_collapse_ok()
@@ -473,9 +466,9 @@ TEST(QEMSimplifier, collapseEdgeNotAllowed)
     qem.computeQuadrics(mesh);
 
     // Ensure quadrics are initialized
-    ASSERT_FALSE(qem.getVertexQuadric(mesh, v0).isZero());
-    ASSERT_FALSE(qem.getVertexQuadric(mesh, v1).isZero());
-    ASSERT_FALSE(qem.getVertexQuadric(mesh, v2).isZero());
+    ASSERT_FALSE(QEMSimplifierUtils::getVertexQuadric(mesh, v0).isZero());
+    ASSERT_FALSE(QEMSimplifierUtils::getVertexQuadric(mesh, v1).isZero());
+    ASSERT_FALSE(QEMSimplifierUtils::getVertexQuadric(mesh, v2).isZero());
 
     // Get the edge between v0 and v1
     TriMesh::EdgeHandle edge;

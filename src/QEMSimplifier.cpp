@@ -1,87 +1,12 @@
 #include "QEMSimplifier.h"
-#include <queue>
 #include <chrono> // TODO: deleteq
+#include "QEMSimplifierUtils.h"
 
-static OpenMesh::VPropHandleT<Eigen::Matrix4d> vQuadric;
-static OpenMesh::VPropHandleT<int> vVersion;
+auto& vQuadric = QEMSimplifierUtils::getQuadricHandle();
+auto& vVersion = QEMSimplifierUtils::getVersionHandle();
 
 QEMSimplifier::QEMSimplifier()
 {
-}
-
-QMatrix& QEMSimplifier::getVertexQuadric(TriMesh& _mesh, const TriMesh::VertexHandle& _vh) const
-{
-    return _mesh.property(vQuadric, _vh);
-}
-
-Eigen::Vector4d QEMSimplifier::computePlaneEquation(const TriMesh::Point& _p0,
-                                                    const TriMesh::Point& _p1,
-                                                    const TriMesh::Point& _p2)
-{
-    TriMesh::Point v1 = _p1 - _p0;
-    TriMesh::Point v2 = _p2 - _p0;
-    TriMesh::Point n = (v1 % v2).normalize(); // Cross product and normalize
-
-    float a = n[0], b = n[1], c = n[2];
-    float d = -(a * _p0[0] + b * _p0[1] + c * _p0[2]);
-    return Eigen::Vector4d(a, b, c, d);
-}
-
-QMatrix QEMSimplifier::computeFaceQuadric(TriMesh& _mesh, TriMesh::FaceHandle _face)
-{
-    std::vector<TriMesh::VertexHandle> faceVerts;
-    for (auto fv_it = _mesh.fv_iter(_face); fv_it.is_valid(); ++fv_it)
-    {
-        faceVerts.push_back(*fv_it);
-    }
-
-    // Note that face validation is not needed (i.e. whether it is degen) because OpenMesh handles that internally.
-
-    TriMesh::Point p0 = _mesh.point(faceVerts[0]);
-    TriMesh::Point p1 = _mesh.point(faceVerts[1]);
-    TriMesh::Point p2 = _mesh.point(faceVerts[2]);
-
-    Eigen::Vector4d plane = computePlaneEquation(p0, p1, p2);
-    // Kp = outer product of plane eq [a,b,c,d]
-    //  [ a^2  ab   ac   ad
-    //    ab   b^2  bc   bd
-    //    ac   bc   c^2  cd
-    //    ad   bd   cd   d^2 ]
-
-    return (plane * plane.transpose());
-}
-
-void QEMSimplifier::computeQuadricsInParallel(TriMesh& _mesh, std::vector<QMatrix>& globalQuadrics)
-{
-    // Store face handles in a temporary structure for parallelization
-    std::vector<TriMesh::FaceHandle> faceHandles;
-    faceHandles.reserve(_mesh.n_faces());
-    for (auto f_it = _mesh.faces_begin(); f_it != _mesh.faces_end(); ++f_it)
-    {
-        faceHandles.push_back(*f_it);
-    }
-
-    // Enable parallelization
-
-    /**
-     * Create a private copy of globalQuadrics for each thread.
-     * Perform independent computations in parallel for each thread.
-     * Combine the results at the end into the shared globalQuadrics array.
-     */
-    #pragma omp parallel for reduction(+: globalQuadrics[:_mesh.n_vertices()])
-    for (int i = 0; i < _mesh.n_faces(); ++i)
-    {
-        TriMesh::FaceHandle fh = faceHandles[i];
-        if (!fh.is_valid()) continue;
-
-        QMatrix Kp = computeFaceQuadric(_mesh, fh);
-
-        for (auto fv_it = _mesh.fv_iter(fh); fv_it.is_valid(); ++fv_it)
-        {
-            size_t vertexIdx = fv_it->idx();
-            globalQuadrics[vertexIdx] += Kp; // Accumulate locally
-        }
-    }
 }
 
 void QEMSimplifier::computeQuadrics(TriMesh& _mesh)
@@ -90,12 +15,12 @@ void QEMSimplifier::computeQuadrics(TriMesh& _mesh)
     // Benchmark for parallelization
     auto start = std::chrono::high_resolution_clock::now(); // Start timer
 
-    initializeProperty(_mesh, vQuadric, "v:quadric", QMatrix::Zero().eval());
-    initializeProperty(_mesh, vVersion, "v:version", 0);
+    QEMSimplifierUtils::initializeProperty(_mesh, vQuadric, "v:quadric", QMatrix::Zero().eval());
+    QEMSimplifierUtils::initializeProperty(_mesh, vVersion, "v:version", 0);
 
     // Allocate global storage for reduction
     std::vector<QMatrix> globalQuadrics(_mesh.n_vertices(), QMatrix::Zero());
-    computeQuadricsInParallel(_mesh, globalQuadrics);
+    QEMSimplifierUtils::computeQuadricsInParallel(_mesh, globalQuadrics);
 
     // Update mesh properties in a single-threaded step
     for (size_t v_idx = 0; v_idx < _mesh.n_vertices(); ++v_idx)
@@ -109,78 +34,6 @@ void QEMSimplifier::computeQuadrics(TriMesh& _mesh)
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
 
     std::cout << "Time taken for computeQuadrics: " << duration.count() << " ms" << std::endl;
-}
-
-QMatrix QEMSimplifier::mergeQuadrics(const TriMesh& _mesh, TriMesh::VertexHandle _v0, TriMesh::VertexHandle _v1)
-{
-    return _mesh.property(vQuadric, _v0) + _mesh.property(vQuadric, _v1);
-}
-
-int QEMSimplifier::sumVersions(const TriMesh& _mesh, TriMesh::VertexHandle _v0, TriMesh::VertexHandle _v1)
-{
-    return _mesh.property(vVersion, _v0) + _mesh.property(vVersion, _v1);
-}
-
-float QEMSimplifier::computeEdgeCollapseCost(TriMesh& _mesh, TriMesh::EdgeHandle _edge, Eigen::Vector3d& _optPos)
-{
-    // Get vert handles
-    TriMesh::HalfedgeHandle he0 = _mesh.halfedge_handle(_edge, 0);
-    TriMesh::VertexHandle v0 = _mesh.to_vertex_handle(he0);
-    TriMesh::VertexHandle v1 = _mesh.from_vertex_handle(he0);
-
-    // Sum of quadrics
-    QMatrix Q = mergeQuadrics(_mesh, v0, v1);
-
-    /**
-     * The goal is to minimize Error(v) = v^T * Q * v, where v is the contraction target
-     * Decompose Q into its components:
-     * Q = [ A  b ]
-     *     [ b^T c ]
-     * where:
-     * A: 3x3 matrix (top-left block of Q).
-     * b: 3x1 vector (last column of Q, excluding the bottom-right element).
-     * c: Scalar (bottom-right element of Q).
-    */
-
-    Eigen::Matrix3d A = Q.topLeftCorner<3, 3>();
-    Eigen::Vector3d b( -Q(0,3), -Q(1,3), -Q(2,3) );
-
-    /**
-     * Expanded Form:
-     * Expanding Error(v) using the decomposition of Q:
-     * Error(v) = [_optPos^T 1] * [ A  b ] * [_optPos]
-     *                         [ b^T c ]  [  1 ]
-     *
-     *          = _optPos^T * A * _optPos + 2 * b^T * _optPos + c
-     *
-     * To minimize Error(v), take the derivative with respect to _optPos:
-     *  d(Error)/d(_optPos) = 2 * A * _optPos + 2 * b = 0
-     *
-     * Solve for _optPos:
-     *  A * _optPos = -b
-     */
-
-    // Check if A is invertible
-    float det = A.determinant();
-    if (fabs(det) > 1e-12)
-    {
-        _optPos = A.ldlt().solve(b);
-        // _optPos = A.inverse() * b;
-    }
-    else // A is nearly singular and cannot be reliably inverted
-    {
-        // Fallback: use midpoint
-        TriMesh::Point p0 = _mesh.point(v0);
-        TriMesh::Point p1 = _mesh.point(v1);
-        TriMesh::Point mid = (p0 + p1) * 0.5f;
-        _optPos = Eigen::Vector3d(mid[0], mid[1], mid[2]);
-    }
-
-    // cost = _optPos^T * Q * _optPos
-    Eigen::Vector4d v4(_optPos[0], _optPos[1], _optPos[2], 1.0);
-    float cost = v4.transpose() * Q * v4;
-
-    return cost;    // collapse cost
 }
 
 // Collapse an edge with a known new vertex position
@@ -203,7 +56,7 @@ bool QEMSimplifier::collapseEdge(TriMesh& _mesh, TriMesh::EdgeHandle _edge, cons
     if (!_mesh.get_property_handle(vQuadric, "v:quadric")) return false;
 
     // Merge quadrics
-    QMatrix QSum = mergeQuadrics(_mesh, _vKeep, vRemove);
+    QMatrix QSum = QEMSimplifierUtils::mergeVertexProperties(_mesh, _vKeep, vRemove, vQuadric);
 
     // Assign to the kept vert
     _mesh.property(vQuadric, _vKeep) = QSum;
@@ -237,10 +90,10 @@ void QEMSimplifier::recalculateEdgeCosts(TriMesh& _mesh,
 
         // Recompute cost
         Eigen::Vector3d localOptPos;
-        float localCost = computeEdgeCollapseCost(_mesh, currEdge, localOptPos);
+        float localCost = QEMSimplifierUtils::computeEdgeCollapseCost(_mesh, currEdge, localOptPos);
 
         // Store new version sum
-        int verSum2 = sumVersions(_mesh, _vKeep, vNeighbor);
+        int verSum2 = QEMSimplifierUtils::mergeVertexProperties(_mesh, _vKeep, vNeighbor, vVersion);
 
         EdgeInfo updatedEdge{currEdge, localCost, localOptPos, verSum2};
         _priQ.push(updatedEdge);
@@ -256,12 +109,12 @@ void QEMSimplifier::initializePriorityQueue(TriMesh& _mesh,
         if (_mesh.status(*e_it).deleted()) continue;
 
         Eigen::Vector3d optPos; // optimal position
-        float cost = computeEdgeCollapseCost(_mesh, *e_it, optPos);
+        float cost = QEMSimplifierUtils::computeEdgeCollapseCost(_mesh, *e_it, optPos);
 
         auto he0 = _mesh.halfedge_handle(*e_it, 0);
         auto v0  = _mesh.to_vertex_handle(he0);
         auto v1  = _mesh.from_vertex_handle(he0);
-        int verSum = sumVersions(_mesh, v0, v1);
+        int verSum = QEMSimplifierUtils::mergeVertexProperties(_mesh, v0, v1, vVersion);
 
         EdgeInfo edgeInfo{*e_it, cost, optPos, verSum};
         _priQ.push(edgeInfo);
@@ -298,13 +151,13 @@ void QEMSimplifier::simplifyMesh(TriMesh& _mesh, size_t _tgtNumFaces)
         TriMesh::HalfedgeHandle he0 = _mesh.halfedge_handle(top.edgeHandle, 0);
         TriMesh::VertexHandle v0    = _mesh.to_vertex_handle(he0);
         TriMesh::VertexHandle v1    = _mesh.from_vertex_handle(he0);
-        unsigned int currVerSum = sumVersions(_mesh, v0, v1);
+        int currVerSum = QEMSimplifierUtils::mergeVertexProperties(_mesh, v0, v1, vVersion);
 
         if (currVerSum != top.versionSum) continue; // stale
 
         // Check cost in case local neighborhood changed
         Eigen::Vector3d verifyPos;
-        float verifyCost = computeEdgeCollapseCost(_mesh, top.edgeHandle, verifyPos);
+        float verifyCost = QEMSimplifierUtils::computeEdgeCollapseCost(_mesh, top.edgeHandle, verifyPos);
         if (std::fabs(verifyCost - top.cost) > 1e-7) continue; // stale/changed
 
         TriMesh::VertexHandle vKeep;
