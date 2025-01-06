@@ -2,6 +2,7 @@
 
 #include "parser.h"
 #include "QEMSimplifier.h"
+#include "QEMSimplifierUtils.h"
 
 constexpr float g_tolerance = 1e-6;
 
@@ -11,9 +12,9 @@ int main(int argc, char **argv)
   return RUN_ALL_TESTS();
 }
 
-/*
-  * Tests for the Parser class
-*/
+// =============================================================================
+//                             Parser Tests
+// =============================================================================
 
 TEST(Parser, LoadValidMesh)
 {
@@ -31,39 +32,168 @@ TEST(Parser, FailToLoadInvalidMesh)
     ASSERT_FALSE(Parser::loadMesh(invalidFile, mesh));
 }
 
-/*
- * Tests for QEMSimplifier
-*/
+// =============================================================================
+//                             Initialize Property Tests
+// =============================================================================
 
-// initializeQuadricsToZero
-TEST(QEMSimplifier, initializeQuadricsToZero)
+class QEMSimplifierUtilsTests : public ::testing::Test
 {
-    QEMSimplifier qem;
+protected:
     TriMesh mesh;
-    std::string validFile = "../object-files/gourd.obj";
-    ASSERT_TRUE(Parser::loadMesh(validFile, mesh));
 
-    static OpenMesh::VPropHandleT<QMatrix> vQuadric;
-    if (!mesh.get_property_handle(vQuadric, "v:quadric"))
-    {
-        mesh.add_property(vQuadric, "v:quadric");
+    void SetUp() override {
+        mesh.add_vertex(TriMesh::Point(0.0, 0.0, 0.0));
+        mesh.add_vertex(TriMesh::Point(1.0, 0.0, 0.0));
+        mesh.add_vertex(TriMesh::Point(0.0, 1.0, 0.0));
     }
+};
 
-    ASSERT_TRUE(mesh.get_property_handle(vQuadric, "v:quadric"));
+TEST_F(QEMSimplifierUtilsTests, InitializePropertyInt)
+{
+    // Define a property and initialize it
+    OpenMesh::VPropHandleT<int> intProperty;
+    QEMSimplifierUtils::initializeProperty(mesh, intProperty, "v:intProperty", 42);
 
-    // Call the function
-    qem.initializeQuadricsToZero(mesh);
-
-    // Verify all quadrics are set to zero
-    for (auto v_it = mesh.vertices_begin(); v_it != mesh.vertices_end(); ++v_it)
-    {
-        QMatrix quadric = mesh.property(vQuadric, *v_it);
-        EXPECT_TRUE(quadric.isZero());
+    // Ensure the property is initialized and default values are set
+    ASSERT_TRUE(mesh.get_property_handle(intProperty, "v:intProperty"));
+    for (auto v_it = mesh.vertices_begin(); v_it != mesh.vertices_end(); ++v_it) {
+        EXPECT_EQ(mesh.property(intProperty, *v_it), 42);
     }
 }
 
-// computePlaneEquation
-TEST(QEMSimplifier, computePlaneEquation)
+TEST_F(QEMSimplifierUtilsTests, InitializePropertyMatrix)
+{
+    // Define another property for testing a different type
+    OpenMesh::VPropHandleT<Eigen::Matrix4d> matrixProperty;
+    QMatrix defaultMatrix = Eigen::Matrix4d::Identity();
+    QEMSimplifierUtils::initializeProperty(mesh, matrixProperty, "v:matrixProperty", defaultMatrix);
+
+    // Ensure the property is initialized and default values are set
+    ASSERT_TRUE(mesh.get_property_handle(matrixProperty, "v:matrixProperty"));
+    for (auto v_it = mesh.vertices_begin(); v_it != mesh.vertices_end(); ++v_it) {
+        EXPECT_TRUE(mesh.property(matrixProperty, *v_it).isApprox(defaultMatrix));
+    }
+}
+
+// =============================================================================
+//                             Merge Property Tests
+// =============================================================================
+
+TEST_F(QEMSimplifierUtilsTests, MergeVertexPropertiesInt)
+{
+    // Define a property and initialize it
+    OpenMesh::VPropHandleT<int> intProperty;
+    QEMSimplifierUtils::initializeProperty(mesh, intProperty, "v:intProperty", 0);
+
+    // Assign values to vertices
+    auto v1 = *mesh.vertices_begin();
+    auto v2 = *(++mesh.vertices_begin());
+
+    // Set custom values for the vertices
+    mesh.property(intProperty, v1) = 10;
+    mesh.property(intProperty, v2) = 20;
+
+    // Merge the properties
+    int mergedValue = QEMSimplifierUtils::mergeVertexProperties(mesh, v1, v2, intProperty);
+    EXPECT_EQ(mergedValue, 30); // 10 + 20
+}
+
+TEST_F(QEMSimplifierUtilsTests, MergeVertexPropertiesMatrix)
+{
+    // Define another property for testing Eigen::Matrix4d
+    OpenMesh::VPropHandleT<Eigen::Matrix4d> matrixProperty;
+    Eigen::Matrix4d defaultMatrix = Eigen::Matrix4d::Zero();
+    QEMSimplifierUtils::initializeProperty(mesh, matrixProperty, "v:matrixProperty", defaultMatrix);
+
+    // Assign values to vertices
+    auto v1 = *mesh.vertices_begin();
+    auto v2 = *(++mesh.vertices_begin());
+
+    // Set custom values for the vertices
+    QMatrix matrix1 = Eigen::Matrix4d::Identity();
+    QMatrix matrix2 = Eigen::Matrix4d::Constant(1.0);
+    mesh.property(matrixProperty, v1) = matrix1;
+    mesh.property(matrixProperty, v2) = matrix2;
+
+    // Merge the properties
+    QMatrix mergedMatrix = QEMSimplifierUtils::mergeVertexProperties(mesh, v1, v2, matrixProperty);
+
+    // Verify the merged matrix
+    QMatrix expectedMatrix = matrix1 + matrix2;
+    EXPECT_TRUE(mergedMatrix.isApprox(expectedMatrix));
+}
+
+// =============================================================================
+//                       Compute Quadrics Parallel Tests
+// =============================================================================
+
+TEST_F(QEMSimplifierUtilsTests, computeQuadricsInParallel)
+{
+    // Prepare global quadrics for each vertex
+    std::vector<QMatrix> globalQuadrics(mesh.n_vertices(), QMatrix::Zero());
+
+    // Compute quadrics in parallel
+    QEMSimplifierUtils::computeQuadricsInParallel(mesh, globalQuadrics);
+
+    // Validate quadrics
+    for (auto v_it = mesh.vertices_begin(); v_it != mesh.vertices_end(); ++v_it)
+    {
+        size_t vertexIdx = v_it->idx();
+
+        // Expected quadric: Sum of quadrics of all adjacent faces
+        QMatrix expectedQuadric = QMatrix::Zero();
+        for (auto vf_it = mesh.vf_iter(*v_it); vf_it.is_valid(); ++vf_it)
+        {
+            expectedQuadric += QEMSimplifierUtils::computeFaceQuadric(mesh, *vf_it);
+        }
+
+        EXPECT_TRUE(globalQuadrics[vertexIdx].isApprox(expectedQuadric, 1e-6));
+    }
+}
+
+TEST_F(QEMSimplifierUtilsTests, computeQuadricsInParallelEmptyMesh) {
+    TriMesh emptyMesh;
+    std::vector<QMatrix> emptyQuadrics;
+
+    QEMSimplifierUtils::computeQuadricsInParallel(emptyMesh, emptyQuadrics);
+
+    EXPECT_TRUE(emptyQuadrics.empty());
+}
+
+TEST_F(QEMSimplifierUtilsTests, ComputeQuadricsInParallelExtendedMesh)
+{
+    // Extend the shared mesh
+    auto v3 = mesh.add_vertex(TriMesh::Point(1.0, 1.0, 0.0));
+    mesh.add_face({mesh.vertex_handle(0), mesh.vertex_handle(1), v3});
+    mesh.add_face({mesh.vertex_handle(1), mesh.vertex_handle(2), v3});
+    mesh.add_face({mesh.vertex_handle(2), mesh.vertex_handle(0), v3});
+
+    std::vector<QMatrix> globalQuadrics(mesh.n_vertices(), QMatrix::Zero());
+
+    QEMSimplifierUtils::computeQuadricsInParallel(mesh, globalQuadrics);
+
+    // Validate results
+    for (auto v_it = mesh.vertices_begin(); v_it != mesh.vertices_end(); ++v_it)
+    {
+        size_t vertexIdx = v_it->idx();
+
+        QMatrix expectedQuadric = QMatrix::Zero();
+        for (auto vf_it = mesh.vf_iter(*v_it); vf_it.is_valid(); ++vf_it)
+        {
+            expectedQuadric += QEMSimplifierUtils::computeFaceQuadric(mesh, *vf_it);
+        }
+        EXPECT_TRUE(globalQuadrics[vertexIdx].isApprox(expectedQuadric, 1e-6));
+    }
+}
+
+
+// =============================================================================
+//                             Compute Plane Equation Tests
+// =============================================================================
+
+class PlaneEquationTest : public ::testing::TestWithParam<std::tuple<TriMesh::Point, TriMesh::Point, TriMesh::Point, Eigen::Vector4d>> {};
+
+TEST_P(PlaneEquationTest, computePlaneEquation)
 {
     /*
     Input: A triangle lying in the XY plane ((0,0,0), (1,0,0), (0,1,0))
@@ -71,120 +201,95 @@ TEST(QEMSimplifier, computePlaneEquation)
                      So, a = 0, b = 0, c = 1, d = 0
     */
 
-    QEMSimplifier qem;
-
     // Triangle vertices in the XY plane
-    TriMesh::Point p0(0, 0, 0);
-    TriMesh::Point p1(1, 0, 0);
-    TriMesh::Point p2(0, 1, 0);
+    auto [p0, p1, p2, expectedPlane] = PlaneEquationTest::GetParam();
+    Eigen::Vector4d plane = QEMSimplifierUtils::computePlaneEquation(p0, p1, p2);
 
-    Eigen::Vector4d plane = qem.computePlaneEquation(p0, p1, p2);
-
-    EXPECT_FLOAT_EQ(plane[0], 0.0); // a = 0
-    EXPECT_FLOAT_EQ(plane[1], 0.0); // b = 0
-    EXPECT_FLOAT_EQ(plane[2], 1.0); // c = 1
-    EXPECT_FLOAT_EQ(plane[3], 0.0); // d = 0
+    EXPECT_FLOAT_EQ(plane[0], expectedPlane[0]); // a
+    EXPECT_FLOAT_EQ(plane[1], expectedPlane[1]); // b
+    EXPECT_FLOAT_EQ(plane[2], expectedPlane[2]); // c
+    EXPECT_FLOAT_EQ(plane[3], expectedPlane[3]); // d
 }
 
-// computePlaneEquation
-TEST(QEMSimplifier, computePlaneEquationTranslatedZ)
-{
-    /*
-    Input: A triangle parallel to the XY plane but shifted in the Z direction ((0,0,1), (1,0,1), (0,1,1))
-    Expected Output: The plane equation should be (z − 1 = 0)
-                     So, a = 0, b = 0, c = 1, d = -1
-    */
-
-    QEMSimplifier qem;
-
-    // Triangle vertices in the XY plane
-    TriMesh::Point p0(0, 0, 1);
-    TriMesh::Point p1(1, 0, 1);
-    TriMesh::Point p2(0, 1, 1);
-
-    Eigen::Vector4d plane = qem.computePlaneEquation(p0, p1, p2);
-
-    EXPECT_FLOAT_EQ(plane[0], 0.0);     // a = 0
-    EXPECT_FLOAT_EQ(plane[1], 0.0);     // b = 0
-    EXPECT_FLOAT_EQ(plane[2], 1.0);     //  c = 1
-    EXPECT_FLOAT_EQ(plane[3], -1.0);    // d = -1
+// Custom name generator for parameterized tests
+std::string PlaneEquationTestName(const ::testing::TestParamInfo<std::tuple<TriMesh::Point, TriMesh::Point, TriMesh::Point, Eigen::Vector4d>>& info) {
+    switch (info.index) {
+        case 0: return "XYPlane";
+        case 1: return "TranslatedZ";
+        case 2: return "RandomTriangle";
+        default: return "Unknown";
+    }
 }
 
-// computePlaneEquation
-TEST(QEMSimplifier, computePlaneEquationRandomTri)
-{
-    /*
-    Input: A triangle that is not aligned with any axis
-    Expected Output: Commented inline below
-    */
+// Instantiate test cases
+INSTANTIATE_TEST_SUITE_P(
+    PlaneEquationTests,
+    PlaneEquationTest,
+    ::testing::Values(
+        std::make_tuple(
+            TriMesh::Point(0, 0, 0), TriMesh::Point(1, 0, 0), TriMesh::Point(0, 1, 0),
+            Eigen::Vector4d(0, 0, 1, 0)
+        ),
+        std::make_tuple(
+            TriMesh::Point(0, 0, 1), TriMesh::Point(1, 0, 1), TriMesh::Point(0, 1, 1),
+            Eigen::Vector4d(0, 0, 1, -1)
+        ),
+        std::make_tuple(
+            TriMesh::Point(0, 0, 0), TriMesh::Point(1, 0, 0), TriMesh::Point(0, 1, 1),
+            Eigen::Vector4d(0, -1.0 / std::sqrt(2.0), 1.0 / std::sqrt(2.0), 0)
+        )
+    ),
+    PlaneEquationTestName
+);
 
-    QEMSimplifier qem;
+// =============================================================================
+//                             Compute Face Quadric Tests
+// =============================================================================
 
-    // Triangle vertices in the XY plane
-    TriMesh::Point p0(0, 0, 0);
-    TriMesh::Point p1(1, 0, 0);
-    TriMesh::Point p2(0, 1, 1);
-
-    /**
-     * v1 = p1 - p0 = (1, 0, 0)
-     * v2 = p2 - p0 = (0, 1, 1)
-     * n = cross(v1, v2) = (0, -1, 1)
-     * ||n|| = sqrt(2)
-     * Normalize n = (0/||n||, -1/||n||, 1/||n||) = (0,−0.7071,0.7071)
-     * Sub into plane eqn to get d = 0
-     */
-
-
-    Eigen::Vector4d plane = qem.computePlaneEquation(p0, p1, p2);
-
-    const float c = (1.0 / std::sqrt(2.0));
-    const float b = -c;
-
-    // Normal vector should be (0.7071, 0.7071, 0.0) normalized
-    // EXPECT_NEAR to prevent floating-point precision errors
-    EXPECT_NEAR(plane[0], 0.0,  g_tolerance); // a ~ 0
-    EXPECT_NEAR(plane[1], b,    g_tolerance); // b ~ -0.7071
-    EXPECT_NEAR(plane[2], c,    g_tolerance); // c ~ 0.7071
-    EXPECT_NEAR(plane[3], 0.0,  g_tolerance); // d = 0
-}
-
-// computeFaceQuadric
-TEST(QEMSimplifier, computeFaceQuadricKnownTriangle)
-{
-    QEMSimplifier qem;
+class QEMSimplifierUtilsFaceQuadricTest : public ::testing::Test {
+protected:
     TriMesh mesh;
 
-    // Create a triangle in the XY plane
-    TriMesh::VertexHandle v0 = mesh.add_vertex(TriMesh::Point(0, 0, 0));
-    TriMesh::VertexHandle v1 = mesh.add_vertex(TriMesh::Point(1, 0, 0));
-    TriMesh::VertexHandle v2 = mesh.add_vertex(TriMesh::Point(0, 1, 0));
-    TriMesh::FaceHandle fh = mesh.add_face(v0, v1, v2);
+    void createXYTriangle() {
+        mesh.add_vertex(TriMesh::Point(0, 0, 0));
+        mesh.add_vertex(TriMesh::Point(1, 0, 0));
+        mesh.add_vertex(TriMesh::Point(0, 1, 0));
+    }
 
-    QMatrix quadric = qem.computeFaceQuadric(mesh, fh);
+    void createArbitraryTriangle() {
+        mesh.add_vertex(TriMesh::Point(0, 0, 0));
+        mesh.add_vertex(TriMesh::Point(1, 0, 0));
+        mesh.add_vertex(TriMesh::Point(0, 1, 1));
+    }
+};
+
+TEST_F(QEMSimplifierUtilsFaceQuadricTest, computeFaceQuadricKnownTriangle)
+{
+    // Create a triangle in the XY plane
+    createXYTriangle();
+    TriMesh::FaceHandle fh = mesh.add_face(mesh.vertex_handle(0), mesh.vertex_handle(1), mesh.vertex_handle(2));
+
+    QMatrix quadric = QEMSimplifierUtils::computeFaceQuadric(mesh, fh);
 
     QMatrix expectedQuadric;
     expectedQuadric.setZero();
     expectedQuadric(2, 2) = 1.0; // Precomputed for z=0
 
-    EXPECT_TRUE(quadric.isApprox(expectedQuadric, 1e-6));
+    EXPECT_TRUE(quadric.isApprox(expectedQuadric, g_tolerance));
 }
 
-TEST(QEMSimplifier, computeFaceQuadricArbitraryTriangle)
+TEST_F(QEMSimplifierUtilsFaceQuadricTest, computeFaceQuadricArbitraryTriangle)
 {
-    QEMSimplifier qem;
-    TriMesh mesh;
-
     // Create a triangle on an arbitrary plane
-    TriMesh::VertexHandle v0 = mesh.add_vertex(TriMesh::Point(0, 0, 0));
-    TriMesh::VertexHandle v1 = mesh.add_vertex(TriMesh::Point(1, 0, 0));
-    TriMesh::VertexHandle v2 = mesh.add_vertex(TriMesh::Point(0, 1, 1));
-    TriMesh::FaceHandle fh = mesh.add_face(v0, v1, v2);
+    createArbitraryTriangle();
+    TriMesh::FaceHandle fh = mesh.add_face(mesh.vertex_handle(0), mesh.vertex_handle(1), mesh.vertex_handle(2));
 
-    QMatrix quadric = qem.computeFaceQuadric(mesh, fh);
+    QMatrix quadric = QEMSimplifierUtils::computeFaceQuadric(mesh, fh);
 
     // Plane equation: computed dynamically
-    Eigen::Vector4d plane = qem.computePlaneEquation(
-        mesh.point(v0), mesh.point(v1), mesh.point(v2));
+    Eigen::Vector4d plane = QEMSimplifierUtils::computePlaneEquation(mesh.point(mesh.vertex_handle(0)),
+                                                                     mesh.point(mesh.vertex_handle(1)),
+                                                                     mesh.point(mesh.vertex_handle(2)));
 
     float a = plane[0];
     float b = plane[1];
@@ -209,52 +314,53 @@ TEST(QEMSimplifier, computeFaceQuadricArbitraryTriangle)
     EXPECT_TRUE(quadric.isApprox(Kp, g_tolerance));
 }
 
-// computeQuadrics
-TEST(QEMSimplifier, computeQuadrics)
+// =============================================================================
+//                             Compute Quadrics Tests
+// =============================================================================
+
+class ComputeQuadricsTest : public ::testing::Test
 {
+protected:
     QEMSimplifier qem;
     TriMesh mesh;
+    OpenMesh::VPropHandleT<QMatrix> vQuadric;
 
-    // Create a simple triangle mesh with two faces
-    TriMesh::VertexHandle v0 = mesh.add_vertex(TriMesh::Point(0, 0, 0));
-    TriMesh::VertexHandle v1 = mesh.add_vertex(TriMesh::Point(1, 0, 0));
-    TriMesh::VertexHandle v2 = mesh.add_vertex(TriMesh::Point(0, 1, 0));
-    TriMesh::VertexHandle v3 = mesh.add_vertex(TriMesh::Point(1, 1, 0));
-    mesh.add_face({v0, v1, v2});
-    mesh.add_face({v1, v3, v2});
-
-    // Initialize property handle for quadrics
-    static OpenMesh::VPropHandleT<QMatrix> vQuadric;
-    if (!mesh.get_property_handle(vQuadric, "v:quadric"))
+    void SetUp() override
     {
-        mesh.add_property(vQuadric, "v:quadric");
+        // Initialize property handle for quadrics
+        if (!mesh.get_property_handle(vQuadric, "v:quadric"))
+        {
+            mesh.add_property(vQuadric, "v:quadric");
+        }
     }
 
+    void createSimpleMesh()
+    {
+        mesh.add_vertex(TriMesh::Point(0, 0, 0));
+        mesh.add_vertex(TriMesh::Point(1, 0, 0));
+        mesh.add_vertex(TriMesh::Point(0, 1, 0));
+        mesh.add_vertex(TriMesh::Point(1, 1, 0));
+        mesh.add_face({mesh.vertex_handle(0), mesh.vertex_handle(1), mesh.vertex_handle(2)});
+        mesh.add_face({mesh.vertex_handle(1), mesh.vertex_handle(3), mesh.vertex_handle(2)});
+    }
+};
+
+TEST_F(ComputeQuadricsTest, computeQuadrics)
+{
+    createSimpleMesh();
     qem.computeQuadrics(mesh);
 
     // Validate vertex quadrics
     for (auto v_it = mesh.vertices_begin(); v_it != mesh.vertices_end(); ++v_it)
     {
         QMatrix quadric = mesh.property(vQuadric, *v_it);
-
         EXPECT_FALSE(quadric.isZero()); // Ensure quadric is updated
     }
 }
 
-TEST(QEMSimplifier, computeQuadricsMeshFile)
+TEST_F(ComputeQuadricsTest, computeQuadricsMeshFile)
 {
-    QEMSimplifier qem;
-    TriMesh mesh;
-
     ASSERT_TRUE(Parser::loadMesh("../object-files/icosahedron.obj", mesh));
-
-    // Initialize property handle for quadrics
-    static OpenMesh::VPropHandleT<QMatrix> vQuadric;
-    if (!mesh.get_property_handle(vQuadric, "v:quadric"))
-    {
-        mesh.add_property(vQuadric, "v:quadric");
-    }
-
     qem.computeQuadrics(mesh);
 
     // Validate vertex quadrics
@@ -266,34 +372,60 @@ TEST(QEMSimplifier, computeQuadricsMeshFile)
     }
 }
 
-TEST(QEMSimplifier, computeEdgeCollapseCostFromObj)
+// =============================================================================
+//                             Compute Edge Collapse Cost Tests
+// =============================================================================
+
+class ComputeEdgeCollapseCostTests : public ::testing::Test
 {
+protected:
     QEMSimplifier qem;
     TriMesh mesh;
 
-    std::string objFilePath = "../object-files/gourd.obj";
-    ASSERT_TRUE(Parser::loadMesh(objFilePath, mesh));
+    void loadTestMesh()
+    {
+        std::string validFile = "../object-files/gourd.obj";
+        ASSERT_TRUE(Parser::loadMesh(validFile, mesh));
+    }
 
+    void createSimpleMesh()
+    {
+        TriMesh::VertexHandle v0 = mesh.add_vertex(TriMesh::Point(0, 0, 0));
+        TriMesh::VertexHandle v1 = mesh.add_vertex(TriMesh::Point(1, 0, 0));
+        TriMesh::VertexHandle v2 = mesh.add_vertex(TriMesh::Point(0, 1, 0)); // Non-collinear vertex
+        mesh.add_face({v0, v1, v2}); // Create a valid triangular face to generate edges
+    }
+
+    void validateVertexQuadrics()
+    {
+        for (auto v_it = mesh.vertices_begin(); v_it != mesh.vertices_end(); ++v_it)
+        {
+            ASSERT_FALSE(QEMSimplifierUtils::getVertexQuadric(mesh, *v_it).isZero());
+        }
+    }
+};
+
+
+TEST_F(ComputeEdgeCollapseCostTests, computeEdgeCollapseCostFromObj)
+{
+    loadTestMesh();
     qem.computeQuadrics(mesh);
 
     // Validate quadrics are non-zero
-    for (auto v_it = mesh.vertices_begin(); v_it != mesh.vertices_end(); ++v_it)
-    {
-        ASSERT_FALSE(qem.getVertexQuadric(mesh, *v_it).isZero());
-    }
+    validateVertexQuadrics();
 
     // Iterate through edges and compute collapse cost
     for (auto e_it = mesh.edges_begin(); e_it != mesh.edges_end(); ++e_it)
     {
         Eigen::Vector3d optPos;
-        float cost = qem.computeEdgeCollapseCost(mesh, *e_it, optPos);
+        float cost = QEMSimplifierUtils::computeEdgeCollapseCost(mesh, *e_it, optPos);
 
         // Retrieve vertex handles for the edge
         auto he = mesh.halfedge_handle(*e_it, 0);
         TriMesh::VertexHandle v0 = mesh.to_vertex_handle(he);
         TriMesh::VertexHandle v1 = mesh.from_vertex_handle(he);
 
-        QMatrix Q = qem.getVertexQuadric(mesh, v0) + qem.getVertexQuadric(mesh, v1);
+        QMatrix Q = QEMSimplifierUtils::getVertexQuadric(mesh, v0) + QEMSimplifierUtils::getVertexQuadric(mesh, v1);
 
         // Note that there is duplication of logic here from the function, so the calculations are not fully independent
         // What's being tested here is that we are not entering the fallback logic in this test
@@ -318,26 +450,17 @@ TEST(QEMSimplifier, computeEdgeCollapseCostFromObj)
     }
 }
 
-TEST(QEMSimplifier, ComputeEdgeCollapseCostFallback) // Hits fallback for A
+TEST_F(ComputeEdgeCollapseCostTests, ComputeEdgeCollapseCostFallback) // Hits fallback for A
 {
-    QEMSimplifier qem;
-    TriMesh mesh;
-
-    TriMesh::VertexHandle v0 = mesh.add_vertex(TriMesh::Point(0, 0, 0));
-    TriMesh::VertexHandle v1 = mesh.add_vertex(TriMesh::Point(1, 0, 0));
-    TriMesh::VertexHandle v2 = mesh.add_vertex(TriMesh::Point(0, 1, 0)); // Non-collinear vertex
-
-    mesh.add_face({v0, v1, v2}); // Create a valid triangular face to generate edges
+    createSimpleMesh();
     qem.computeQuadrics(mesh);
 
-    for (auto v_it = mesh.vertices_begin(); v_it != mesh.vertices_end(); ++v_it)
-    {
-        ASSERT_FALSE(qem.getVertexQuadric(mesh, *v_it).isZero());
-    }
+    // Validate quadrics are non-zero
+    validateVertexQuadrics();
 
     auto edge = *mesh.edges_begin(); // Get the first edge in the mesh
     Eigen::Vector3d optPos;
-    float cost = qem.computeEdgeCollapseCost(mesh, edge, optPos);
+    float cost = QEMSimplifierUtils::computeEdgeCollapseCost(mesh, edge, optPos);
 
     EXPECT_NEAR(optPos[0], 0.5, g_tolerance); // Midpoint x-coordinate
     EXPECT_NEAR(optPos[1], 0.0, g_tolerance); // Midpoint y-coordinate
@@ -348,82 +471,106 @@ TEST(QEMSimplifier, ComputeEdgeCollapseCostFallback) // Hits fallback for A
     EXPECT_EQ(cost, 0.0);
 }
 
-TEST(QEMSimplifier, collapseEdge)
+// =============================================================================
+//                             Collapse Edge Tests
+// =============================================================================
+
+class CollapseEdgeTest : public ::testing::Test
 {
+protected:
     QEMSimplifier qem;
     TriMesh mesh;
 
-    // TODO: move into a function
-    // Example inspired from Figure 1 in the paper "Surface Simplification Using Quadric Error Metrics"
-    TriMesh::VertexHandle v1 = mesh.add_vertex(TriMesh::Point(0.0, 0.0, 0.0));
-    TriMesh::VertexHandle v2 = mesh.add_vertex(TriMesh::Point(1.0, 0.0, 0.0));
-    TriMesh::VertexHandle v3 = mesh.add_vertex(TriMesh::Point(-0.5, 1.0, 0.0));
-    TriMesh::VertexHandle v4 = mesh.add_vertex(TriMesh::Point(0.5, 1.5, 0.0));
-    TriMesh::VertexHandle v5 = mesh.add_vertex(TriMesh::Point(1.5, 1.0, 0.0));
-    TriMesh::VertexHandle v6 = mesh.add_vertex(TriMesh::Point(-1.0, 0.0, 0.0));
-    TriMesh::VertexHandle v7 = mesh.add_vertex(TriMesh::Point(2.0, 0.0, 0.0));
-    TriMesh::VertexHandle v8 = mesh.add_vertex(TriMesh::Point(-0.5, -1.0, 0.0));
-    TriMesh::VertexHandle v9 = mesh.add_vertex(TriMesh::Point(0.5, -1.5, 0.0));
-    TriMesh::VertexHandle v10 = mesh.add_vertex(TriMesh::Point(1.5, -1.0, 0.0));
+    void loadTestMesh()
+    {
+        // Example inspired from Figure 1 in the paper "Surface Simplification Using Quadric Error Metrics"
+        std::string validFile = "../object-files/test.obj";
+        ASSERT_TRUE(Parser::loadMesh(validFile, mesh));
+    }
 
-    mesh.add_face({v1, v8, v9});
-    mesh.add_face({v1, v6, v8});
-    mesh.add_face({v1, v3, v6});
-    mesh.add_face({v1, v4, v3});
-    mesh.add_face({v1, v2, v4});
-    mesh.add_face({v1, v9, v2});
-    mesh.add_face({v2, v5, v4});
-    mesh.add_face({v2, v7, v5});
-    mesh.add_face({v2, v10, v7});
-    mesh.add_face({v2, v9, v10});
+    void createSimpleTriangleMesh()
+    {
+        TriMesh::VertexHandle v0 = mesh.add_vertex(TriMesh::Point(0.0, 0.0, 0.0));
+        TriMesh::VertexHandle v1 = mesh.add_vertex(TriMesh::Point(1.0, 0.0, 0.0));
+        TriMesh::VertexHandle v2 = mesh.add_vertex(TriMesh::Point(0.5, 1.0, 0.0));
+        mesh.add_face({v0, v1, v2});
+    }
+
+    void initializeMeshStatusFlags()
+    {
+        // Request necessary status flags
+        // needed for is_collapse_ok()
+        mesh.request_vertex_status();
+        mesh.request_edge_status();
+        mesh.request_face_status();
+    }
+
+    TriMesh::VertexHandle findVertexByPoint(const TriMesh::Point& point)
+    {
+        for (auto v_it = mesh.vertices_begin(); v_it != mesh.vertices_end(); ++v_it)
+        {
+            if (mesh.point(*v_it) == point)
+            {
+                return *v_it;
+            }
+        }
+        return TriMesh::VertexHandle();
+    }
+
+    void findEdgeBetweenVertices(TriMesh::VertexHandle _v1, TriMesh::VertexHandle _v2, TriMesh::EdgeHandle& _edge)
+    {
+        for (auto e_it = mesh.edges_begin(); e_it != mesh.edges_end(); ++e_it)
+        {
+            auto he0 = mesh.halfedge_handle(*e_it, 0);
+            auto he1 = mesh.halfedge_handle(*e_it, 1);
+
+            if ((mesh.to_vertex_handle(he0) == _v2 && mesh.from_vertex_handle(he0) == _v1) ||
+                (mesh.to_vertex_handle(he1) == _v1 && mesh.from_vertex_handle(he1) == _v2))
+            {
+                _edge = *e_it;
+                break;
+            }
+        }
+        ASSERT_TRUE(_edge.is_valid()) << "Edge between specified vertices not found.";
+    }
+};
+
+TEST_F(CollapseEdgeTest, collapseEdge)
+{
+    loadTestMesh();
 
     // Verify initial mesh structure
     EXPECT_EQ(mesh.n_vertices(), 10);
     EXPECT_EQ(mesh.n_faces(), 10);
     EXPECT_EQ(mesh.n_edges(), 19);
 
+    // Find v1 and v2
+    auto v1 = findVertexByPoint(TriMesh::Point(0.0, 0.0, 0.0));
+    auto v2 = findVertexByPoint(TriMesh::Point(1.0, 0.0, 0.0));
+    // Ensure that v1 and v2 are valid
+    ASSERT_TRUE(v1.is_valid());
+    ASSERT_TRUE(v2.is_valid());
+
     qem.computeQuadrics(mesh);
 
     // Ensure quadrics are initialized
-    ASSERT_FALSE(qem.getVertexQuadric(mesh, v1).isZero());
-    ASSERT_FALSE(qem.getVertexQuadric(mesh, v2).isZero());
-    ASSERT_FALSE(qem.getVertexQuadric(mesh, v3).isZero());
-    ASSERT_FALSE(qem.getVertexQuadric(mesh, v4).isZero());
-    ASSERT_FALSE(qem.getVertexQuadric(mesh, v5).isZero());
-    ASSERT_FALSE(qem.getVertexQuadric(mesh, v6).isZero());
-    ASSERT_FALSE(qem.getVertexQuadric(mesh, v7).isZero());
-    ASSERT_FALSE(qem.getVertexQuadric(mesh, v8).isZero());
-    ASSERT_FALSE(qem.getVertexQuadric(mesh, v9).isZero());
-    ASSERT_FALSE(qem.getVertexQuadric(mesh, v10).isZero());
+    for (auto v_it = mesh.vertices_begin(); v_it != mesh.vertices_end(); ++v_it)
+    {
+        QMatrix vQuadric = QEMSimplifierUtils::getVertexQuadric(mesh, *v_it);
+        ASSERT_FALSE(vQuadric.isZero()); // Ensure quadric is updated
+    }
 
-    // Request necessary status flags
-    // needed for is_collapse_ok()
-    mesh.request_vertex_status();
-    mesh.request_edge_status();
-    mesh.request_face_status();
+    initializeMeshStatusFlags();
 
     // Find the edge between v1 and v2
     TriMesh::EdgeHandle edge;
-    for (auto e_it = mesh.edges_begin(); e_it != mesh.edges_end(); ++e_it)
-    {
-        auto he0 = mesh.halfedge_handle(*e_it, 0);
-        auto he1 = mesh.halfedge_handle(*e_it, 1);
-
-        if ((mesh.to_vertex_handle(he0) == v2 && mesh.from_vertex_handle(he0) == v1) ||
-            (mesh.to_vertex_handle(he1) == v1 && mesh.from_vertex_handle(he1) == v2))
-        {
-            edge = *e_it;
-            break;
-        }
-    }
-
-    ASSERT_TRUE(edge.is_valid());
+    findEdgeBetweenVertices(v1, v2, edge);
 
     // Check if the collapse is allowed
     TriMesh::HalfedgeHandle he0 = mesh.halfedge_handle(edge, 0);
     ASSERT_TRUE(mesh.is_collapse_ok(he0));
 
-    TriMesh::VertexHandle vKeep = mesh.to_vertex_handle(he0); // By convention, keep "to_vertex"
+    // TriMesh::VertexHandle vKeep = mesh.to_vertex_handle(he0); // By convention, keep "to_vertex"
 
     // Compute the new position for vKeep (midpoint of v1 and v2)
     Eigen::Vector3d newPos;
@@ -433,8 +580,9 @@ TEST(QEMSimplifier, collapseEdge)
     newPos[1] = (p1[1] + p2[1]) / 2.0;
     newPos[2] = (p1[2] + p2[2]) / 2.0;
 
+    TriMesh::VertexHandle vKeep;
     // Collapse the edge
-    ASSERT_TRUE(qem.collapseEdge(mesh, edge, newPos));
+    ASSERT_TRUE(qem.collapseEdge(mesh, edge, newPos, vKeep));
 
     // Remove deleted vertices, edges, and faces from the mesh
     mesh.garbage_collection();
@@ -447,55 +595,384 @@ TEST(QEMSimplifier, collapseEdge)
     // Verify the position of the new vertex
     TriMesh::Point vKeepPos = mesh.point(vKeep);
 
-    EXPECT_FLOAT_EQ(vKeepPos[0], newPos[0]) << "x-coordinate of new vertex is incorrect.";
-    EXPECT_FLOAT_EQ(vKeepPos[1], newPos[1]) << "y-coordinate of new vertex is incorrect.";
-    EXPECT_FLOAT_EQ(vKeepPos[2], newPos[2]) << "z-coordinate of new vertex is incorrect.";
+    EXPECT_FLOAT_EQ(vKeepPos[0], newPos[0]);
+    EXPECT_FLOAT_EQ(vKeepPos[1], newPos[1]);
+    EXPECT_FLOAT_EQ(vKeepPos[2], newPos[2]);
 }
 
-TEST(QEMSimplifier, collapseEdgeNotAllowed)
+TEST_F(CollapseEdgeTest, collapseEdgeNotAllowed)
 {
-    QEMSimplifier qem;
-    TriMesh mesh;
-
-    // Create a simple triangle mesh
-    TriMesh::VertexHandle v0 = mesh.add_vertex(TriMesh::Point(0.0, 0.0, 0.0));
-    TriMesh::VertexHandle v1 = mesh.add_vertex(TriMesh::Point(1.0, 0.0, 0.0));
-    TriMesh::VertexHandle v2 = mesh.add_vertex(TriMesh::Point(0.5, 1.0, 0.0));
-    mesh.add_face({v0, v1, v2});
-
-    // Request necessary status flags
-    // needed for is_collapse_ok()
-    mesh.request_vertex_status();
-    mesh.request_edge_status();
-    mesh.request_face_status();
+    createSimpleTriangleMesh();
+    initializeMeshStatusFlags();
 
     qem.computeQuadrics(mesh);
 
     // Ensure quadrics are initialized
-    ASSERT_FALSE(qem.getVertexQuadric(mesh, v0).isZero());
-    ASSERT_FALSE(qem.getVertexQuadric(mesh, v1).isZero());
-    ASSERT_FALSE(qem.getVertexQuadric(mesh, v2).isZero());
+    for (auto v_it = mesh.vertices_begin(); v_it != mesh.vertices_end(); ++v_it)
+    {
+        QMatrix vQuadric = QEMSimplifierUtils::getVertexQuadric(mesh, *v_it);
+        ASSERT_FALSE(vQuadric.isZero()); // Ensure quadric is updated
+    }
+
+    // Find the edge between v0 and v1
+    auto v0 = mesh.vertex_handle(0); // First vertex
+    auto v1 = mesh.vertex_handle(1); // Second vertex
+    ASSERT_TRUE(v0.is_valid());
+    ASSERT_TRUE(v1.is_valid());
 
     // Get the edge between v0 and v1
     TriMesh::EdgeHandle edge;
-    for (auto he_it = mesh.voh_iter(v0); he_it.is_valid(); ++he_it)
-    {
-        if (mesh.to_vertex_handle(*he_it) == v1)
-        {
-            edge = mesh.edge_handle(*he_it);
-            break;
-        }
-    }
+    findEdgeBetweenVertices(v0, v1, edge);
 
     // New position for vKeep
     Eigen::Vector3d newPos(0.5, 0.0, 0.0); // Midpoint of v0 and v1
 
+    TriMesh::VertexHandle vKeep;
     // Collapse the edge
     // Should fail because only a planar triangle has been passed
-    ASSERT_FALSE(qem.collapseEdge(mesh, edge, newPos));
+    ASSERT_FALSE(qem.collapseEdge(mesh, edge, newPos, vKeep));
 
     // Validate the mesh after collapse fails
     EXPECT_EQ(mesh.n_vertices(), 3);
     EXPECT_EQ(mesh.n_edges(), 3);
     EXPECT_EQ(mesh.n_faces(), 1);
+}
+
+// =============================================================================
+//                       Initialize Priority Queue Tests
+// =============================================================================
+
+class InitializePriorityQueueTest : public ::testing::Test
+{
+protected:
+    QEMSimplifier qem;
+    TriMesh mesh;
+    OpenMesh::VPropHandleT<int> vVersion; // Vertex version property
+
+    using EdgeInfo = QEMSimplifier::EdgeInfo;
+
+    void SetUp() override
+    {
+        // Initialize vertex version property
+        if (!mesh.get_property_handle(vVersion, "v:version"))
+        {
+            mesh.add_property(vVersion, "v:version");
+            for (auto v_it = mesh.vertices_begin(); v_it != mesh.vertices_end(); ++v_it)
+            {
+                mesh.property(vVersion, *v_it) = 0; // Initialize to 0
+            }
+        }
+
+        // Create a simple triangle mesh
+        TriMesh::VertexHandle v0 = mesh.add_vertex(TriMesh::Point(0, 0, 0));
+        TriMesh::VertexHandle v1 = mesh.add_vertex(TriMesh::Point(1, 0, 0));
+        TriMesh::VertexHandle v2 = mesh.add_vertex(TriMesh::Point(0.5, 1, 0));
+        TriMesh::VertexHandle v3 = mesh.add_vertex(TriMesh::Point(0.0, 0.0, 1.0));
+        mesh.add_face({v0, v1, v2});
+        mesh.add_face({v0, v1, v3});
+        mesh.add_face({v0, v2, v3});
+        mesh.add_face({v1, v2, v3});
+
+        // Request necessary status flags
+        // needed for is_collapse_ok()
+        mesh.request_vertex_status();
+        mesh.request_edge_status();
+        mesh.request_face_status();
+    }
+
+    void findEdgeBetweenVertices(TriMesh::VertexHandle _v1, TriMesh::VertexHandle _v2, TriMesh::EdgeHandle& _edge)
+    {
+        for (auto e_it = mesh.edges_begin(); e_it != mesh.edges_end(); ++e_it)
+        {
+            auto he0 = mesh.halfedge_handle(*e_it, 0);
+            auto he1 = mesh.halfedge_handle(*e_it, 1);
+
+            if ((mesh.to_vertex_handle(he0) == _v2 && mesh.from_vertex_handle(he0) == _v1) ||
+                (mesh.to_vertex_handle(he1) == _v1 && mesh.from_vertex_handle(he1) == _v2))
+            {
+                _edge = *e_it;
+                break;
+            }
+        }
+        ASSERT_TRUE(_edge.is_valid()) << "Edge between specified vertices not found.";
+    }
+};
+
+TEST_F(InitializePriorityQueueTest, initializePriorityQueue)
+{
+    // Prepare the priority queue
+    std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>> priQ;
+
+    qem.computeQuadrics(mesh);
+    qem.initializePriorityQueue(mesh, priQ);
+
+    // Validate priority queue size
+    EXPECT_EQ(priQ.size(), mesh.n_edges());
+
+    // Validate edge information in the queue
+    while (!priQ.empty())
+    {
+        EdgeInfo edgeInfo = priQ.top();
+        priQ.pop();
+
+        // Ensure the cost is populated; it can be 0
+        EXPECT_GE(edgeInfo.cost, 0.0f);
+
+        // Ensure the optimal position is within expected bounds
+        EXPECT_GE(edgeInfo.optPos[0], 0.0);
+        EXPECT_GE(edgeInfo.optPos[1], 0.0);
+        EXPECT_GE(edgeInfo.optPos[2], 0.0);
+    }
+}
+
+TEST_F(InitializePriorityQueueTest, initializePriorityQueueEmptyMesh)
+{
+    TriMesh emptyMesh;
+    std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>> priQ;
+
+    qem.initializePriorityQueue(emptyMesh, priQ);
+
+    // Priority queue should be empty for an empty mesh
+    EXPECT_EQ(priQ.size(), 0);
+}
+
+TEST_F(InitializePriorityQueueTest, initializePriorityQueueDeletedEdges)
+{
+    const int numEdges = mesh.n_edges();
+    // Find the edge between v0 and v1
+    auto v0 = mesh.vertex_handle(0); // First vertex
+    auto v1 = mesh.vertex_handle(1); // Second vertex
+    ASSERT_TRUE(v0.is_valid());
+    ASSERT_TRUE(v1.is_valid());
+
+    // Get the edge between v0 and v1
+    TriMesh::EdgeHandle edge;
+    findEdgeBetweenVertices(v0, v1, edge);
+    mesh.garbage_collection();
+
+    // Mark one edge as deleted
+    mesh.status(edge).set_deleted(true);
+
+    std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>> priQ;
+    qem.computeQuadrics(mesh);
+    qem.initializePriorityQueue(mesh, priQ);
+
+    // Priority queue should only contain the non-deleted edge
+    EXPECT_EQ(priQ.size(), (numEdges - 1));
+
+    EdgeInfo edgeInfo = priQ.top();
+    EXPECT_GE(edgeInfo.cost, 0.0f);
+}
+
+// =============================================================================
+//                              Simplify Mesh Tests
+// =============================================================================
+
+class SimplifyMeshTest : public ::testing::Test
+{
+protected:
+    QEMSimplifier simplifier;
+    TriMesh mesh;
+    OpenMesh::VPropHandleT<int> vVersion;
+
+    void SetUp() override {
+        // Initialize the mesh
+        if (!mesh.get_property_handle(vVersion, "v:version"))
+        {
+            mesh.add_property(vVersion, "v:version");
+            for (auto v_it = mesh.vertices_begin(); v_it != mesh.vertices_end(); ++v_it)
+            {
+                mesh.property(vVersion, *v_it) = 0;
+            }
+        }
+
+        // Create a simple triangular mesh
+        TriMesh::VertexHandle v0 = mesh.add_vertex(TriMesh::Point(0, 0, 0));
+        TriMesh::VertexHandle v1 = mesh.add_vertex(TriMesh::Point(1, 0, 0));
+        TriMesh::VertexHandle v2 = mesh.add_vertex(TriMesh::Point(0.5, 1, 0));
+        TriMesh::VertexHandle v3 = mesh.add_vertex(TriMesh::Point(1, 1, 0));
+        TriMesh::VertexHandle v4 = mesh.add_vertex(TriMesh::Point(0, 1, 0));
+
+        mesh.add_face({v0, v1, v2});
+        mesh.add_face({v1, v3, v2});
+        mesh.add_face({v2, v3, v4});
+        mesh.add_face({v4, v0, v2});
+    }
+};
+
+TEST_F(SimplifyMeshTest, simplifyMesh)
+{
+    size_t targetFaces = 2;
+
+    // Simplify the mesh
+    simplifier.simplifyMesh(mesh, targetFaces);
+
+    // Verify the number of faces
+    EXPECT_LE(mesh.n_faces(), targetFaces);
+
+    EXPECT_GE(mesh.n_vertices(), 3);
+    EXPECT_GE(mesh.n_edges(), 3);
+}
+
+TEST_F(SimplifyMeshTest, simplifyEmptyMesh)
+{
+    TriMesh emptyMesh;
+
+    // Simplify the empty mesh
+    simplifier.simplifyMesh(emptyMesh, 0);
+
+    // Verify the mesh is still empty
+    EXPECT_EQ(emptyMesh.n_faces(), 0);
+    EXPECT_EQ(emptyMesh.n_vertices(), 0);
+    EXPECT_EQ(emptyMesh.n_edges(), 0);
+}
+
+TEST_F(SimplifyMeshTest, simplifyMeshTgtFacesGreaterThanBaseMesh)
+{
+    size_t currentFaces = mesh.n_faces();
+    size_t targetFaces = currentFaces + 2;
+
+    // Simplify the mesh
+    simplifier.simplifyMesh(mesh, targetFaces);
+
+    // Verify the number of faces remains unchanged
+    EXPECT_EQ(mesh.n_faces(), currentFaces);
+}
+
+TEST_F(SimplifyMeshTest, simplifyMeshNegativeFaces)
+{
+    size_t tgtFaces = static_cast<size_t>(-1); // Negative target
+
+    // Simplify the mesh
+    simplifier.simplifyMesh(mesh, tgtFaces);
+
+    EXPECT_GE(mesh.n_faces(), 4);
+    EXPECT_GE(mesh.n_vertices(), 5);
+}
+
+// =============================================================================
+//                         Recalculate Edge Cost Tests
+// =============================================================================
+
+class RecalculateEdgeCostsTest : public ::testing::Test
+{
+protected:
+    QEMSimplifier qem;
+    TriMesh mesh;
+    OpenMesh::VPropHandleT<int> vVersion;
+
+     using EdgeInfo = QEMSimplifier::EdgeInfo;
+
+    void SetUp() override {
+        // Initialize the mesh
+        if (!mesh.get_property_handle(vVersion, "v:version"))
+        {
+            mesh.add_property(vVersion, "v:version");
+            for (auto v_it = mesh.vertices_begin(); v_it != mesh.vertices_end(); ++v_it)
+            {
+                mesh.property(vVersion, *v_it) = 0;
+            }
+        }
+
+        // Create a simple quad mesh (two connected triangles)
+        TriMesh::VertexHandle v0 = mesh.add_vertex(TriMesh::Point(0, 0, 0));
+        TriMesh::VertexHandle v1 = mesh.add_vertex(TriMesh::Point(1, 0, 0));
+        TriMesh::VertexHandle v2 = mesh.add_vertex(TriMesh::Point(0, 1, 0));
+        TriMesh::VertexHandle v3 = mesh.add_vertex(TriMesh::Point(1, 1, 0));
+
+        mesh.add_face({v0, v1, v2}); // First triangle
+        mesh.add_face({v1, v3, v2}); // Second triangle
+
+        mesh.request_vertex_status();
+        mesh.request_edge_status();
+        mesh.request_face_status();
+    }
+};
+
+TEST_F(RecalculateEdgeCostsTest, recalculateEdgeCosts)
+{
+    qem.computeQuadrics(mesh);
+
+    std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>> priQ;
+    qem.initializePriorityQueue(mesh, priQ);
+
+    // Simulate collapsing an edge
+    auto he = mesh.find_halfedge(mesh.vertex_handle(0), mesh.vertex_handle(1));
+    auto edge = mesh.edge_handle(he);
+    auto vKeep = mesh.vertex_handle(0); // Keep v0
+
+    // Mark the edge as collapsed
+    mesh.status(edge).set_deleted(true);
+
+    // Recalculate edge costs around vKeep
+    qem.recalculateEdgeCosts(mesh, vKeep, priQ);
+
+    // Expected recalculated costs
+    std::unordered_map<int, float> expectedCosts;
+    for (auto vv_it = mesh.vv_iter(vKeep); vv_it.is_valid(); ++vv_it)
+    {
+        auto vNeighbor = *vv_it;
+        auto he = mesh.find_halfedge(vKeep, vNeighbor);
+        auto edge = mesh.edge_handle(he);
+
+        // Compute the expected cost
+        Eigen::Vector3d optPos;
+        float expectedCost = QEMSimplifierUtils::computeEdgeCollapseCost(mesh, edge, optPos);
+
+        expectedCosts[edge.idx()] = expectedCost;
+    }
+
+    // Validate recalculated costs in the priority queue
+    while (!priQ.empty())
+    {
+        EdgeInfo edgeInfo = priQ.top();
+        priQ.pop();
+
+        if (mesh.status(edgeInfo.edgeHandle).deleted())
+        {
+            continue; // skip
+        }
+
+        // Validate recalculated cost
+        EXPECT_NEAR(edgeInfo.cost, expectedCosts[edgeInfo.edgeHandle.idx()], 1e-6);
+
+        // Validate the version sum
+        int expectedVersionSum = QEMSimplifierUtils::mergeVertexProperties(
+            mesh,
+            mesh.to_vertex_handle(mesh.halfedge_handle(edgeInfo.edgeHandle, 0)),
+            mesh.from_vertex_handle(mesh.halfedge_handle(edgeInfo.edgeHandle, 0)),
+            vVersion
+        );
+        EXPECT_EQ(edgeInfo.versionSum, expectedVersionSum);
+    }
+}
+
+TEST_F(RecalculateEdgeCostsTest, recalculateEdgeCostsNoValidNeighbors)
+{
+    std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>> priQ;
+
+    // Mark all edges as deleted
+    auto vKeep = mesh.vertex_handle(0);
+    for (auto vv_it = mesh.vv_iter(vKeep); vv_it.is_valid(); ++vv_it)
+    {
+        auto he = mesh.find_halfedge(vKeep, *vv_it);
+        mesh.status(mesh.edge_handle(he)).set_deleted(true);
+    }
+
+    qem.recalculateEdgeCosts(mesh, vKeep, priQ);
+
+    // Ensure the priority queue remains empty
+    EXPECT_TRUE(priQ.empty());
+}
+
+TEST_F(RecalculateEdgeCostsTest, recalculateEdgeCostsEmptyMesh)
+{
+    TriMesh emptyMesh;
+    std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>> priQ;
+
+    // Attempt to recalculate edge costs on an empty mesh
+    qem.recalculateEdgeCosts(emptyMesh, TriMesh::VertexHandle(0), priQ);
+
+    // Ensure the priority queue remains empty
+    EXPECT_TRUE(priQ.empty());
 }

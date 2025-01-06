@@ -52,8 +52,10 @@ target_sources(QEMSimplifier PRIVATE
     src/main.cpp
     src/parser.cpp
     src/QEMSimplifier.cpp
+    src/QEMSimplifierUtils.cpp
     include/parser.h
     include/QEMSimplifier.h
+    include/QEMSimplifierUtils.h
     ${TINYFILEDIALOGS_DIR}/tinyfiledialogs.c
 )
 
@@ -95,6 +97,7 @@ target_sources(QEMSimplifierTests PRIVATE
     tests/QEMSimplifierTests.cpp
     src/parser.cpp
     src/QEMSimplifier.cpp
+    src/QEMSimplifierUtils.cpp
 )
 
 # Include directories for tests
