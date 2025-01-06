@@ -42,12 +42,12 @@ private:
                               TriMesh::VertexHandle _vKeep,
                               std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>>& _priQ);
 
-    FRIEND_TEST(QEMSimplifier, computeQuadrics);
-    FRIEND_TEST(QEMSimplifier, computeQuadricsMeshFile);
-    FRIEND_TEST(QEMSimplifier, computeEdgeCollapseCostFromObj);
-    FRIEND_TEST(QEMSimplifier, ComputeEdgeCollapseCostFallback);
-    FRIEND_TEST(QEMSimplifier, collapseEdge);
-    FRIEND_TEST(QEMSimplifier, collapseEdgeNotAllowed);
+    FRIEND_TEST(ComputeQuadricsTest, computeQuadrics);
+    FRIEND_TEST(ComputeQuadricsTest, computeQuadricsMeshFile);
+    FRIEND_TEST(ComputeEdgeCollapseCostTests, computeEdgeCollapseCostFromObj);
+    FRIEND_TEST(ComputeEdgeCollapseCostTests, ComputeEdgeCollapseCostFallback);
+    FRIEND_TEST(CollapseEdgeTest, collapseEdge);
+    FRIEND_TEST(CollapseEdgeTest, collapseEdgeNotAllowed);
 };
 
 #endif // QEMSIMPLIFIER_H_
