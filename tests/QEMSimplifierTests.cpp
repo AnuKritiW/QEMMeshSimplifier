@@ -128,6 +128,70 @@ TEST_F(QEMSimplifierUtilsTests, MergeVertexPropertiesMatrix)
 }
 
 // =============================================================================
+//                       Compute Quadrics Parallel Tests
+// =============================================================================
+
+TEST_F(QEMSimplifierUtilsTests, computeQuadricsInParallel)
+{
+    // Prepare global quadrics for each vertex
+    std::vector<QMatrix> globalQuadrics(mesh.n_vertices(), QMatrix::Zero());
+
+    // Compute quadrics in parallel
+    QEMSimplifierUtils::computeQuadricsInParallel(mesh, globalQuadrics);
+
+    // Validate quadrics
+    for (auto v_it = mesh.vertices_begin(); v_it != mesh.vertices_end(); ++v_it)
+    {
+        size_t vertexIdx = v_it->idx();
+
+        // Expected quadric: Sum of quadrics of all adjacent faces
+        QMatrix expectedQuadric = QMatrix::Zero();
+        for (auto vf_it = mesh.vf_iter(*v_it); vf_it.is_valid(); ++vf_it)
+        {
+            expectedQuadric += QEMSimplifierUtils::computeFaceQuadric(mesh, *vf_it);
+        }
+
+        EXPECT_TRUE(globalQuadrics[vertexIdx].isApprox(expectedQuadric, 1e-6));
+    }
+}
+
+TEST_F(QEMSimplifierUtilsTests, computeQuadricsInParallelEmptyMesh) {
+    TriMesh emptyMesh;
+    std::vector<QMatrix> emptyQuadrics;
+
+    QEMSimplifierUtils::computeQuadricsInParallel(emptyMesh, emptyQuadrics);
+
+    EXPECT_TRUE(emptyQuadrics.empty());
+}
+
+TEST_F(QEMSimplifierUtilsTests, ComputeQuadricsInParallelExtendedMesh)
+{
+    // Extend the shared mesh
+    auto v3 = mesh.add_vertex(TriMesh::Point(1.0, 1.0, 0.0));
+    mesh.add_face({mesh.vertex_handle(0), mesh.vertex_handle(1), v3});
+    mesh.add_face({mesh.vertex_handle(1), mesh.vertex_handle(2), v3});
+    mesh.add_face({mesh.vertex_handle(2), mesh.vertex_handle(0), v3});
+
+    std::vector<QMatrix> globalQuadrics(mesh.n_vertices(), QMatrix::Zero());
+
+    QEMSimplifierUtils::computeQuadricsInParallel(mesh, globalQuadrics);
+
+    // Validate results
+    for (auto v_it = mesh.vertices_begin(); v_it != mesh.vertices_end(); ++v_it)
+    {
+        size_t vertexIdx = v_it->idx();
+
+        QMatrix expectedQuadric = QMatrix::Zero();
+        for (auto vf_it = mesh.vf_iter(*v_it); vf_it.is_valid(); ++vf_it)
+        {
+            expectedQuadric += QEMSimplifierUtils::computeFaceQuadric(mesh, *vf_it);
+        }
+        EXPECT_TRUE(globalQuadrics[vertexIdx].isApprox(expectedQuadric, 1e-6));
+    }
+}
+
+
+// =============================================================================
 //                             Compute Plane Equation Tests
 // =============================================================================
 
@@ -576,4 +640,130 @@ TEST_F(CollapseEdgeTest, collapseEdgeNotAllowed)
     EXPECT_EQ(mesh.n_vertices(), 3);
     EXPECT_EQ(mesh.n_edges(), 3);
     EXPECT_EQ(mesh.n_faces(), 1);
+}
+
+// =============================================================================
+//                       Initialize Priority Queue Tests
+// =============================================================================
+
+class InitializePriorityQueueTest : public ::testing::Test
+{
+protected:
+    QEMSimplifier qem;
+    TriMesh mesh;
+    OpenMesh::VPropHandleT<int> vVersion; // Vertex version property
+
+    using EdgeInfo = QEMSimplifier::EdgeInfo;
+
+    void SetUp() override
+    {
+        // Initialize vertex version property
+        if (!mesh.get_property_handle(vVersion, "v:version"))
+        {
+            mesh.add_property(vVersion, "v:version");
+            for (auto v_it = mesh.vertices_begin(); v_it != mesh.vertices_end(); ++v_it)
+            {
+                mesh.property(vVersion, *v_it) = 0; // Initialize to 0
+            }
+        }
+
+        // Create a simple triangle mesh
+        TriMesh::VertexHandle v0 = mesh.add_vertex(TriMesh::Point(0, 0, 0));
+        TriMesh::VertexHandle v1 = mesh.add_vertex(TriMesh::Point(1, 0, 0));
+        TriMesh::VertexHandle v2 = mesh.add_vertex(TriMesh::Point(0.5, 1, 0));
+        TriMesh::VertexHandle v3 = mesh.add_vertex(TriMesh::Point(0.0, 0.0, 1.0));
+        mesh.add_face({v0, v1, v2});
+        mesh.add_face({v0, v1, v3});
+        mesh.add_face({v0, v2, v3});
+        mesh.add_face({v1, v2, v3});
+
+        // Request necessary status flags
+        // needed for is_collapse_ok()
+        mesh.request_vertex_status();
+        mesh.request_edge_status();
+        mesh.request_face_status();
+    }
+
+    void findEdgeBetweenVertices(TriMesh::VertexHandle _v1, TriMesh::VertexHandle _v2, TriMesh::EdgeHandle& _edge)
+    {
+        for (auto e_it = mesh.edges_begin(); e_it != mesh.edges_end(); ++e_it)
+        {
+            auto he0 = mesh.halfedge_handle(*e_it, 0);
+            auto he1 = mesh.halfedge_handle(*e_it, 1);
+
+            if ((mesh.to_vertex_handle(he0) == _v2 && mesh.from_vertex_handle(he0) == _v1) ||
+                (mesh.to_vertex_handle(he1) == _v1 && mesh.from_vertex_handle(he1) == _v2))
+            {
+                _edge = *e_it;
+                break;
+            }
+        }
+        ASSERT_TRUE(_edge.is_valid()) << "Edge between specified vertices not found.";
+    }
+};
+
+TEST_F(InitializePriorityQueueTest, initializePriorityQueue)
+{
+    // Prepare the priority queue
+    std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>> priQ;
+
+    qem.computeQuadrics(mesh);
+    qem.initializePriorityQueue(mesh, priQ);
+
+    // Validate priority queue size
+    EXPECT_EQ(priQ.size(), mesh.n_edges());
+
+    // Validate edge information in the queue
+    while (!priQ.empty())
+    {
+        EdgeInfo edgeInfo = priQ.top();
+        priQ.pop();
+
+        // Ensure the cost is populated; it can be 0
+        EXPECT_GE(edgeInfo.cost, 0.0f);
+
+        // Ensure the optimal position is within expected bounds
+        EXPECT_GE(edgeInfo.optPos[0], 0.0);
+        EXPECT_GE(edgeInfo.optPos[1], 0.0);
+        EXPECT_GE(edgeInfo.optPos[2], 0.0);
+    }
+}
+
+TEST_F(InitializePriorityQueueTest, initializePriorityQueueEmptyMesh)
+{
+    TriMesh emptyMesh;
+    std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>> priQ;
+
+    qem.initializePriorityQueue(emptyMesh, priQ);
+
+    // Priority queue should be empty for an empty mesh
+    EXPECT_EQ(priQ.size(), 0);
+}
+
+TEST_F(InitializePriorityQueueTest, initializePriorityQueueDeletedEdges)
+{
+    const int numEdges = mesh.n_edges();
+    // Find the edge between v0 and v1
+    auto v0 = mesh.vertex_handle(0); // First vertex
+    auto v1 = mesh.vertex_handle(1); // Second vertex
+    ASSERT_TRUE(v0.is_valid());
+    ASSERT_TRUE(v1.is_valid());
+
+    // Get the edge between v0 and v1
+    TriMesh::EdgeHandle edge;
+    findEdgeBetweenVertices(v0, v1, edge);
+    mesh.garbage_collection();
+
+    // Mark one edge as deleted
+    mesh.status(edge).set_deleted(true);
+
+    std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>> priQ;
+    qem.computeQuadrics(mesh);
+    qem.initializePriorityQueue(mesh, priQ);
+
+    // Priority queue should only contain the non-deleted edge
+    EXPECT_EQ(priQ.size(), (numEdges - 1));
+
+    EdgeInfo edgeInfo = priQ.top();
+    EXPECT_GE(edgeInfo.cost, 0.0f);
 }

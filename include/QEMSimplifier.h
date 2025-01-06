@@ -32,22 +32,28 @@ private:
 
 private:
     void computeQuadrics(TriMesh& _mesh);
+    FRIEND_TEST(ComputeQuadricsTest, computeQuadrics);
+    FRIEND_TEST(ComputeQuadricsTest, computeQuadricsMeshFile);
+
     void initializePriorityQueue(TriMesh& _mesh,
                                  std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>>& _priQ);
+                                     friend class InitializePriorityQueueTest;
+    FRIEND_TEST(InitializePriorityQueueTest, initializePriorityQueue);
+    FRIEND_TEST(InitializePriorityQueueTest, initializePriorityQueueEmptyMesh);
+    FRIEND_TEST(InitializePriorityQueueTest, initializePriorityQueueDeletedEdges);
+
     bool collapseEdge(TriMesh& _mesh,
                       TriMesh::EdgeHandle _edge,
                       const Eigen::Vector3d& _newPos,
                       TriMesh::VertexHandle& _vKeep);
+    FRIEND_TEST(CollapseEdgeTest, collapseEdge);
+    FRIEND_TEST(CollapseEdgeTest, collapseEdgeNotAllowed);
+
     void recalculateEdgeCosts(TriMesh& _mesh,
                               TriMesh::VertexHandle _vKeep,
                               std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>>& _priQ);
-
-    FRIEND_TEST(ComputeQuadricsTest, computeQuadrics);
-    FRIEND_TEST(ComputeQuadricsTest, computeQuadricsMeshFile);
     FRIEND_TEST(ComputeEdgeCollapseCostTests, computeEdgeCollapseCostFromObj);
     FRIEND_TEST(ComputeEdgeCollapseCostTests, ComputeEdgeCollapseCostFallback);
-    FRIEND_TEST(CollapseEdgeTest, collapseEdge);
-    FRIEND_TEST(CollapseEdgeTest, collapseEdgeNotAllowed);
 };
 
 #endif // QEMSIMPLIFIER_H_
