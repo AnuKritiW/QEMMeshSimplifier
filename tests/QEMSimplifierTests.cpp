@@ -12,9 +12,9 @@ int main(int argc, char **argv)
   return RUN_ALL_TESTS();
 }
 
-/*
-  * Tests for the Parser class
-*/
+// =============================================================================
+//                             Parser Tests
+// =============================================================================
 
 TEST(Parser, LoadValidMesh)
 {
@@ -31,10 +31,6 @@ TEST(Parser, FailToLoadInvalidMesh)
     std::string invalidFile = "../nonexistent.obj";
     ASSERT_FALSE(Parser::loadMesh(invalidFile, mesh));
 }
-
-/*
- * Tests for QEMSimplifierUtils
-*/
 
 // =============================================================================
 //                             Initialize Property Tests
@@ -766,4 +762,217 @@ TEST_F(InitializePriorityQueueTest, initializePriorityQueueDeletedEdges)
 
     EdgeInfo edgeInfo = priQ.top();
     EXPECT_GE(edgeInfo.cost, 0.0f);
+}
+
+// =============================================================================
+//                              Simplify Mesh Tests
+// =============================================================================
+
+class SimplifyMeshTest : public ::testing::Test
+{
+protected:
+    QEMSimplifier simplifier;
+    TriMesh mesh;
+    OpenMesh::VPropHandleT<int> vVersion;
+
+    void SetUp() override {
+        // Initialize the mesh
+        if (!mesh.get_property_handle(vVersion, "v:version"))
+        {
+            mesh.add_property(vVersion, "v:version");
+            for (auto v_it = mesh.vertices_begin(); v_it != mesh.vertices_end(); ++v_it)
+            {
+                mesh.property(vVersion, *v_it) = 0;
+            }
+        }
+
+        // Create a simple triangular mesh
+        TriMesh::VertexHandle v0 = mesh.add_vertex(TriMesh::Point(0, 0, 0));
+        TriMesh::VertexHandle v1 = mesh.add_vertex(TriMesh::Point(1, 0, 0));
+        TriMesh::VertexHandle v2 = mesh.add_vertex(TriMesh::Point(0.5, 1, 0));
+        TriMesh::VertexHandle v3 = mesh.add_vertex(TriMesh::Point(1, 1, 0));
+        TriMesh::VertexHandle v4 = mesh.add_vertex(TriMesh::Point(0, 1, 0));
+
+        mesh.add_face({v0, v1, v2});
+        mesh.add_face({v1, v3, v2});
+        mesh.add_face({v2, v3, v4});
+        mesh.add_face({v4, v0, v2});
+    }
+};
+
+TEST_F(SimplifyMeshTest, simplifyMesh)
+{
+    size_t targetFaces = 2;
+
+    // Simplify the mesh
+    simplifier.simplifyMesh(mesh, targetFaces);
+
+    // Verify the number of faces
+    EXPECT_LE(mesh.n_faces(), targetFaces);
+
+    EXPECT_GE(mesh.n_vertices(), 3);
+    EXPECT_GE(mesh.n_edges(), 3);
+}
+
+TEST_F(SimplifyMeshTest, simplifyEmptyMesh)
+{
+    TriMesh emptyMesh;
+
+    // Simplify the empty mesh
+    simplifier.simplifyMesh(emptyMesh, 0);
+
+    // Verify the mesh is still empty
+    EXPECT_EQ(emptyMesh.n_faces(), 0);
+    EXPECT_EQ(emptyMesh.n_vertices(), 0);
+    EXPECT_EQ(emptyMesh.n_edges(), 0);
+}
+
+TEST_F(SimplifyMeshTest, simplifyMeshTgtFacesGreaterThanBaseMesh)
+{
+    size_t currentFaces = mesh.n_faces();
+    size_t targetFaces = currentFaces + 2;
+
+    // Simplify the mesh
+    simplifier.simplifyMesh(mesh, targetFaces);
+
+    // Verify the number of faces remains unchanged
+    EXPECT_EQ(mesh.n_faces(), currentFaces);
+}
+
+TEST_F(SimplifyMeshTest, simplifyMeshNegativeFaces)
+{
+    size_t tgtFaces = static_cast<size_t>(-1); // Negative target
+
+    // Simplify the mesh
+    simplifier.simplifyMesh(mesh, tgtFaces);
+
+    EXPECT_GE(mesh.n_faces(), 4);
+    EXPECT_GE(mesh.n_vertices(), 5);
+}
+
+// =============================================================================
+//                         Recalculate Edge Cost Tests
+// =============================================================================
+
+class RecalculateEdgeCostsTest : public ::testing::Test
+{
+protected:
+    QEMSimplifier qem;
+    TriMesh mesh;
+    OpenMesh::VPropHandleT<int> vVersion;
+
+     using EdgeInfo = QEMSimplifier::EdgeInfo;
+
+    void SetUp() override {
+        // Initialize the mesh
+        if (!mesh.get_property_handle(vVersion, "v:version"))
+        {
+            mesh.add_property(vVersion, "v:version");
+            for (auto v_it = mesh.vertices_begin(); v_it != mesh.vertices_end(); ++v_it)
+            {
+                mesh.property(vVersion, *v_it) = 0;
+            }
+        }
+
+        // Create a simple quad mesh (two connected triangles)
+        TriMesh::VertexHandle v0 = mesh.add_vertex(TriMesh::Point(0, 0, 0));
+        TriMesh::VertexHandle v1 = mesh.add_vertex(TriMesh::Point(1, 0, 0));
+        TriMesh::VertexHandle v2 = mesh.add_vertex(TriMesh::Point(0, 1, 0));
+        TriMesh::VertexHandle v3 = mesh.add_vertex(TriMesh::Point(1, 1, 0));
+
+        mesh.add_face({v0, v1, v2}); // First triangle
+        mesh.add_face({v1, v3, v2}); // Second triangle
+
+        mesh.request_vertex_status();
+        mesh.request_edge_status();
+        mesh.request_face_status();
+    }
+};
+
+TEST_F(RecalculateEdgeCostsTest, recalculateEdgeCosts)
+{
+    qem.computeQuadrics(mesh);
+
+    std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>> priQ;
+    qem.initializePriorityQueue(mesh, priQ);
+
+    // Simulate collapsing an edge
+    auto he = mesh.find_halfedge(mesh.vertex_handle(0), mesh.vertex_handle(1));
+    auto edge = mesh.edge_handle(he);
+    auto vKeep = mesh.vertex_handle(0); // Keep v0
+
+    // Mark the edge as collapsed
+    mesh.status(edge).set_deleted(true);
+
+    // Recalculate edge costs around vKeep
+    qem.recalculateEdgeCosts(mesh, vKeep, priQ);
+
+    // Expected recalculated costs
+    std::unordered_map<int, float> expectedCosts;
+    for (auto vv_it = mesh.vv_iter(vKeep); vv_it.is_valid(); ++vv_it)
+    {
+        auto vNeighbor = *vv_it;
+        auto he = mesh.find_halfedge(vKeep, vNeighbor);
+        auto edge = mesh.edge_handle(he);
+
+        // Compute the expected cost
+        Eigen::Vector3d optPos;
+        float expectedCost = QEMSimplifierUtils::computeEdgeCollapseCost(mesh, edge, optPos);
+
+        expectedCosts[edge.idx()] = expectedCost;
+    }
+
+    // Validate recalculated costs in the priority queue
+    while (!priQ.empty())
+    {
+        EdgeInfo edgeInfo = priQ.top();
+        priQ.pop();
+
+        if (mesh.status(edgeInfo.edgeHandle).deleted())
+        {
+            continue; // skip
+        }
+
+        // Validate recalculated cost
+        EXPECT_NEAR(edgeInfo.cost, expectedCosts[edgeInfo.edgeHandle.idx()], 1e-6);
+
+        // Validate the version sum
+        int expectedVersionSum = QEMSimplifierUtils::mergeVertexProperties(
+            mesh,
+            mesh.to_vertex_handle(mesh.halfedge_handle(edgeInfo.edgeHandle, 0)),
+            mesh.from_vertex_handle(mesh.halfedge_handle(edgeInfo.edgeHandle, 0)),
+            vVersion
+        );
+        EXPECT_EQ(edgeInfo.versionSum, expectedVersionSum);
+    }
+}
+
+TEST_F(RecalculateEdgeCostsTest, recalculateEdgeCostsNoValidNeighbors)
+{
+    std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>> priQ;
+
+    // Mark all edges as deleted
+    auto vKeep = mesh.vertex_handle(0);
+    for (auto vv_it = mesh.vv_iter(vKeep); vv_it.is_valid(); ++vv_it)
+    {
+        auto he = mesh.find_halfedge(vKeep, *vv_it);
+        mesh.status(mesh.edge_handle(he)).set_deleted(true);
+    }
+
+    qem.recalculateEdgeCosts(mesh, vKeep, priQ);
+
+    // Ensure the priority queue remains empty
+    EXPECT_TRUE(priQ.empty());
+}
+
+TEST_F(RecalculateEdgeCostsTest, recalculateEdgeCostsEmptyMesh)
+{
+    TriMesh emptyMesh;
+    std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>> priQ;
+
+    // Attempt to recalculate edge costs on an empty mesh
+    qem.recalculateEdgeCosts(emptyMesh, TriMesh::VertexHandle(0), priQ);
+
+    // Ensure the priority queue remains empty
+    EXPECT_TRUE(priQ.empty());
 }

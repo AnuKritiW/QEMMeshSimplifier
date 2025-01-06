@@ -99,6 +99,13 @@ void QEMSimplifier::recalculateEdgeCosts(TriMesh& _mesh,
                                          TriMesh::VertexHandle _vKeep,
                                          std::priority_queue<EdgeInfo,std::vector<EdgeInfo>, std::greater<EdgeInfo>>& _priQ)
 {
+    if (_mesh.n_vertices() == 0)
+    {
+        std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>> emptyQueue;
+        std::swap(_priQ, emptyQueue);
+        return;
+    }
+
     for (auto vv_it = _mesh.vv_iter(_vKeep); vv_it.is_valid(); ++vv_it)
     {
         TriMesh::VertexHandle vNeighbor = *vv_it;
@@ -123,6 +130,9 @@ void QEMSimplifier::recalculateEdgeCosts(TriMesh& _mesh,
 
 void QEMSimplifier::simplifyMesh(TriMesh& _mesh, size_t _tgtNumFaces)
 {
+    if (_mesh.n_faces() <= _tgtNumFaces) return;
+    if (_tgtNumFaces < 1) return;
+
     computeQuadrics(_mesh);
 
     // tell the mesh to allocate internal “status” flags for vertices, edges, faces, and halfedges.
