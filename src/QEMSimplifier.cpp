@@ -39,9 +39,14 @@ void QEMSimplifier::computeQuadrics(TriMesh& _mesh)
 void QEMSimplifier::initializePriorityQueue(TriMesh& _mesh,
                                             std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>>& _priQ)
 {
+    std::vector<EdgeInfo> edgeInfos;
+    edgeInfos.resize(_mesh.n_edges());
+
+    #pragma omp parallel for
     // for every edge, compute the cost and the new pos
-    for (auto e_it = _mesh.edges_begin(); e_it != _mesh.edges_end(); ++e_it)
+    for (size_t idx = 0; idx < _mesh.n_edges(); ++idx)
     {
+        auto e_it = std::next(_mesh.edges_begin(), idx);
         if (_mesh.status(*e_it).deleted()) continue;
 
         Eigen::Vector3d optPos; // optimal position
@@ -52,8 +57,15 @@ void QEMSimplifier::initializePriorityQueue(TriMesh& _mesh,
         auto v1  = _mesh.from_vertex_handle(he0);
         int verSum = QEMSimplifierUtils::mergeVertexProperties(_mesh, v0, v1, vVersion);
 
-        EdgeInfo edgeInfo{*e_it, cost, optPos, verSum};
-        _priQ.push(edgeInfo);
+        edgeInfos[idx] = EdgeInfo{*e_it, cost, optPos, verSum};
+    }
+
+    for (const auto& edgeInfo : edgeInfos)
+    {
+        if (edgeInfo.edgeHandle.is_valid())
+        {
+            _priQ.push(edgeInfo);
+        }
     }
 }
 
@@ -106,25 +118,46 @@ void QEMSimplifier::recalculateEdgeCosts(TriMesh& _mesh,
         return;
     }
 
-    for (auto vv_it = _mesh.vv_iter(_vKeep); vv_it.is_valid(); ++vv_it)
+    // Temp container for storing updated edges
+    std::vector<EdgeInfo> updatedEdges;
+
+    #pragma omp parallel
     {
-        TriMesh::VertexHandle vNeighbor = *vv_it;
+        // Thread safe temp container
+        std::vector<EdgeInfo> localEdges;
 
-        TriMesh::HalfedgeHandle currHe = _mesh.find_halfedge(_vKeep, vNeighbor);
-        if (!currHe.is_valid()) continue;
+        #pragma omp for nowait
+        for (int i = 0; i < static_cast<int>(_mesh.valence(_vKeep)); ++i)
+        {
+            // Get the i-th neighbor of _vKeep
+            auto vv_it = std::next(_mesh.vv_iter(_vKeep), i);
+            TriMesh::VertexHandle vNeighbor = *vv_it;
 
-        TriMesh::EdgeHandle currEdge = _mesh.edge_handle(currHe);
-        if (!currEdge.is_valid() || _mesh.status(currEdge).deleted()) continue;
+            TriMesh::HalfedgeHandle currHe = _mesh.find_halfedge(_vKeep, vNeighbor);
+            if (!currHe.is_valid()) continue;
 
-        // Recompute cost
-        Eigen::Vector3d localOptPos;
-        float localCost = QEMSimplifierUtils::computeEdgeCollapseCost(_mesh, currEdge, localOptPos);
+            TriMesh::EdgeHandle currEdge = _mesh.edge_handle(currHe);
+            if (!currEdge.is_valid() || _mesh.status(currEdge).deleted()) continue;
 
-        // Store new version sum
-        int verSum2 = QEMSimplifierUtils::mergeVertexProperties(_mesh, _vKeep, vNeighbor, vVersion);
+            // Recompute cost
+            Eigen::Vector3d localOptPos;
+            float localCost = QEMSimplifierUtils::computeEdgeCollapseCost(_mesh, currEdge, localOptPos);
 
-        EdgeInfo updatedEdge{currEdge, localCost, localOptPos, verSum2};
-        _priQ.push(updatedEdge);
+            // Store new version sum
+            int verSum2 = QEMSimplifierUtils::mergeVertexProperties(_mesh, _vKeep, vNeighbor, vVersion);
+
+            localEdges.push_back(EdgeInfo{currEdge, localCost, localOptPos, verSum2});
+        }
+
+        #pragma omp critical
+        {
+            updatedEdges.insert(updatedEdges.end(), localEdges.begin(), localEdges.end());
+        }
+    }
+
+    for (const auto& edgeInfo : updatedEdges)
+    {
+        _priQ.push(edgeInfo);
     }
 }
 
