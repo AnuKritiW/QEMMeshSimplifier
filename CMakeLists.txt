@@ -56,6 +56,7 @@ target_sources(QEMSimplifier PRIVATE
     include/parser.h
     include/QEMSimplifier.h
     include/QEMSimplifierUtils.h
+    include/QEMSimplifierUtils_config.h
     ${TINYFILEDIALOGS_DIR}/tinyfiledialogs.c
 )
 
@@ -75,6 +76,61 @@ target_link_libraries(QEMSimplifier PRIVATE OpenMeshCore OpenMeshTools)
 # Add Polyscope subdirectory and link Polyscope to the executable
 add_subdirectory(${POLYSCOPE_DIR} ${CMAKE_BINARY_DIR}/polyscope_build)
 target_link_libraries(QEMSimplifier PRIVATE polyscope)
+
+###############################################################################
+# Metal GPU Backend (Optional)
+###############################################################################
+option(USE_METAL "Use Metal GPU Backend" OFF)
+
+if(USE_METAL)
+  set(CMAKE_OSX_DEPLOYMENT_TARGET "15.0")
+
+  # Define a macro your code can detect
+  add_definitions(-DQEM_USE_METAL)
+
+  # Find Metal and MetalKit frameworks
+  find_library(METAL_FRAMEWORK Metal)
+  find_library(METALKIT_FRAMEWORK MetalKit)
+
+  target_link_libraries(QEMSimplifier PRIVATE ${METAL_FRAMEWORK} ${METALKIT_FRAMEWORK})
+
+  # Compile .metal to .air
+  add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/QEMSimplifierUtilsKernel.air
+    COMMAND xcrun metal -c
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/QEMSimplifierUtilsKernel.metal
+            -o ${CMAKE_CURRENT_BINARY_DIR}/QEMSimplifierUtilsKernel.air
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/QEMSimplifierUtilsKernel.metal
+    COMMENT "Compiling QEMSimplifierUtilsKernel.metal to AIR"
+  )
+
+  # Link .air to .metallib
+  add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/QEMSimplifierUtilsKernel.metallib
+    COMMAND xcrun metallib
+            ${CMAKE_CURRENT_BINARY_DIR}/QEMSimplifierUtilsKernel.air
+            -o ${CMAKE_CURRENT_BINARY_DIR}/QEMSimplifierUtilsKernel.metallib
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/QEMSimplifierUtilsKernel.air
+    COMMENT "Linking AIR to create metallib"
+  )
+
+  # Add a custom target for the metallib
+  add_custom_target(QEMSimplifierUtilsKernelMetallib
+    DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/QEMSimplifierUtilsKernel.metallib
+  )
+
+  # Add bridging .mm file to QEMSimplifier
+  target_sources(QEMSimplifier PRIVATE src/QEMSimplifierUtils_metal.mm)
+
+  # Compile QEMSimplifierUtils_metal.mm as Objective-C++
+  set_source_files_properties(src/QEMSimplifierUtils_metal.mm PROPERTIES COMPILE_FLAGS "-x objective-c++")
+
+  # Link the Metal frameworks to QEMSimplifier
+  target_link_libraries(QEMSimplifier PRIVATE ${METAL_FRAMEWORK} ${METALKIT_FRAMEWORK})
+
+  # Ensure main target depends on the metallib build
+  add_dependencies(QEMSimplifier QEMSimplifierUtilsKernelMetallib)
+endif()
 
 #################################################################################
 # Testing code
@@ -116,6 +172,26 @@ target_link_libraries(QEMSimplifierTests PRIVATE
     OpenMeshCore
     OpenMeshTools
 )
+
+# Metal-specific configurations for tests
+if(USE_METAL)
+    # Include Metal bridging file
+    target_sources(QEMSimplifierTests PRIVATE src/QEMSimplifierUtils_metal.mm)
+
+    # Add dependency on the Metal library
+    add_dependencies(QEMSimplifierTests QEMSimplifierUtilsKernelMetallib)
+
+    # Link Metal and MetalKit frameworks
+    target_link_libraries(QEMSimplifierTests PRIVATE ${METAL_FRAMEWORK} ${METALKIT_FRAMEWORK})
+
+    # Link Objective-C runtime libraries
+    find_library(FOUNDATION_FRAMEWORK Foundation)
+    find_library(COREFRAMEWORK CoreFoundation)
+    target_link_libraries(QEMSimplifierTests PRIVATE ${FOUNDATION_FRAMEWORK} ${COREFRAMEWORK})
+
+    # Ensure Objective-C++ compilation
+    set_source_files_properties(src/QEMSimplifierUtils_metal.mm PROPERTIES COMPILE_FLAGS "-x objective-c++")
+endif()
 
 # Automatically discover and register tests
 enable_testing()

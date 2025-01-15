@@ -1,6 +1,7 @@
 #ifndef QEMSIMPLIFIERUTILS_H_
 #define QEMSIMPLIFIERUTILS_H_
 
+#include "QEMSimplifierUtils_config.h"
 #include <OpenMesh/Core/IO/MeshIO.hh>
 #include <OpenMesh/Core/Mesh/TriMesh_ArrayKernelT.hh>
 #include <Eigen/Dense>
