@@ -97,7 +97,7 @@ if(USE_METAL)
   # Compile .metal to .air
   add_custom_command(
     OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/QEMSimplifierUtilsKernel.air
-    COMMAND xcrun metal -c
+    COMMAND xcrun -sdk macosx metal -std=metal3.0 -c
             ${CMAKE_CURRENT_SOURCE_DIR}/src/QEMSimplifierUtilsKernel.metal
             -o ${CMAKE_CURRENT_BINARY_DIR}/QEMSimplifierUtilsKernel.air
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/QEMSimplifierUtilsKernel.metal

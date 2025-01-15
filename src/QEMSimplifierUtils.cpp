@@ -3,10 +3,15 @@
 OpenMesh::VPropHandleT<Eigen::Matrix4d> QEMSimplifierUtils::vQuadric;
 OpenMesh::VPropHandleT<int> QEMSimplifierUtils::vVersion;
 
+#if defined(QEM_BACKEND_METAL)
+extern void computeQuadricsInParallel_Metal(TriMesh& mesh, std::vector<QMatrix>& globalQuadrics);
+#endif
+
 Eigen::Vector4d QEMSimplifierUtils::computePlaneEquation(const TriMesh::Point& _p0,
                                                          const TriMesh::Point& _p1,
                                                          const TriMesh::Point& _p2)
 {
+    // Note: v1 and v2 are edge vectors. TriMesh::Point represents both positions but also 3 value vectors (e.g. direction/normal)
     TriMesh::Point v1 = _p1 - _p0;
     TriMesh::Point v2 = _p2 - _p0;
     TriMesh::Point n = (v1 % v2).normalize(); // Cross product and normalize
@@ -41,8 +46,12 @@ QMatrix QEMSimplifierUtils::computeFaceQuadric(TriMesh& _mesh, TriMesh::FaceHand
     return (plane * plane.transpose());
 }
 
-void QEMSimplifierUtils::computeQuadricsInParallel(TriMesh& _mesh, std::vector<QMatrix>& globalQuadrics)
+void QEMSimplifierUtils::computeQuadricsInParallel(TriMesh& _mesh, std::vector<QMatrix>& _globalQuadrics)
 {
+#if defined(QEM_BACKEND_METAL)
+    computeQuadricsInParallel_Metal(_mesh, _globalQuadrics);
+    std::cout<<"METAL\n";
+#else
     // Store face handles in a temporary structure for parallelization
     std::vector<TriMesh::FaceHandle> faceHandles;
     faceHandles.reserve(_mesh.n_faces());
@@ -58,7 +67,7 @@ void QEMSimplifierUtils::computeQuadricsInParallel(TriMesh& _mesh, std::vector<Q
      * Perform independent computations in parallel for each thread.
      * Combine the results at the end into the shared globalQuadrics array.
      */
-    #pragma omp parallel for reduction(+: globalQuadrics[:_mesh.n_vertices()])
+    #pragma omp parallel for reduction(+: _globalQuadrics[:_mesh.n_vertices()])
     for (int i = 0; i < _mesh.n_faces(); ++i)
     {
         TriMesh::FaceHandle fh = faceHandles[i];
@@ -69,9 +78,11 @@ void QEMSimplifierUtils::computeQuadricsInParallel(TriMesh& _mesh, std::vector<Q
         for (auto fv_it = _mesh.fv_iter(fh); fv_it.is_valid(); ++fv_it)
         {
             size_t vertexIdx = fv_it->idx();
-            globalQuadrics[vertexIdx] += Kp; // Accumulate locally
+            _globalQuadrics[vertexIdx] += Kp; // Accumulate locally
         }
     }
+    std::cout<<"CPU\n";
+#endif
 }
 
 float QEMSimplifierUtils::computeEdgeCollapseCost(TriMesh& _mesh, TriMesh::EdgeHandle _edge, Eigen::Vector3d& _optPos)

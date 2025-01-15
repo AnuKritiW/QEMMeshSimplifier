@@ -9,6 +9,10 @@
 typedef OpenMesh::TriMesh_ArrayKernelT<> TriMesh;
 typedef Eigen::Matrix4d QMatrix;
 
+#if defined(QEM_BACKEND_METAL)
+extern "C" void computeQuadricsInParallel_Metal(TriMesh& mesh, std::vector<QMatrix>& globalQuadrics);
+#endif
+
 class QEMSimplifierUtils
 {
 public:
