@@ -130,6 +130,14 @@ if(USE_METAL)
 
   # Ensure main target depends on the metallib build
   add_dependencies(QEMSimplifier QEMSimplifierUtilsKernelMetallib)
+  message("CMAKE_CURRENT_BINARY_DIR: ${CMAKE_CURRENT_BINARY_DIR}")
+  # target_compile_definitions(QEMSimplifier PRIVATE CMAKE_METALLIB_PATH="${CMAKE_CURRENT_BINARY_DIR}/QEMSimplifierUtilsKernel.metallib")
+  # target_compile_definitions(QEMSimplifier PRIVATE CMAKE_METALLIB_PATH="${CMAKE_CURRENT_BINARY_DIR}/QEMSimplifierUtilsKernel.metallib")
+  target_compile_definitions(
+    QEMSimplifier
+    PRIVATE
+    CMAKE_METALLIB_PATH=\"${CMAKE_CURRENT_BINARY_DIR}/QEMSimplifierUtilsKernel.metallib\"
+  )
 endif()
 
 #################################################################################
@@ -191,6 +199,13 @@ if(USE_METAL)
 
     # Ensure Objective-C++ compilation
     set_source_files_properties(src/QEMSimplifierUtils_metal.mm PROPERTIES COMPILE_FLAGS "-x objective-c++")
+
+    target_compile_definitions(
+      QEMSimplifierTests
+      PRIVATE
+      CMAKE_METALLIB_PATH=\"${CMAKE_CURRENT_BINARY_DIR}/QEMSimplifierUtilsKernel.metallib\"
+    )
+
 endif()
 
 # Automatically discover and register tests

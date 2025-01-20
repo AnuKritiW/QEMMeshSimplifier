@@ -16,6 +16,7 @@ kernel void computeFaceQuadricKernel( const device Face*   faces        [[ buffe
                                       const device float3* vertexPos    [[ buffer(1) ]],
                                       device float4x4*     faceQuadrics [[ buffer(2) ]],
                                       constant uint&       numFaces     [[ buffer(3) ]],
+                                      device float4x4* debugLogBuffer [[buffer(4)]],
                                       uint                 gid          [[ thread_position_in_grid ]] )
 {
     if (gid >= numFaces) return;
@@ -39,6 +40,8 @@ kernel void computeFaceQuadricKernel( const device Face*   faces        [[ buffe
             Kp[r][c] = plane[r] * plane[c];
         }
     }
+
+    debugLogBuffer[gid] = Kp;
 
     faceQuadrics[gid] = Kp;
 }

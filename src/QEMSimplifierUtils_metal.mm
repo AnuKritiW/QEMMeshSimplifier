@@ -28,9 +28,17 @@ void initializeMetal()
     // Only initialize gLibrary once
     if (gLibrary) return;
 
-    NSString* metallibPath = [NSString stringWithUTF8String:"${CMAKE_CURRENT_BINARY_DIR}/QEMSimplifierUtilsKernel.metallib"];
-    NSError* err = nil;
+    NSString *metallibPath = @CMAKE_METALLIB_PATH;
 
+    // Check if the file exists at runtime
+    NSLog(@"metallubPath: %@", metallibPath);
+    if (![[NSFileManager defaultManager] fileExistsAtPath:metallibPath])
+    {
+        NSLog(@"Metal library not found");
+        return; // Exit early since the file does not exist
+    }
+
+    NSError* err = nil;
     NSURL* metallibURL = [NSURL fileURLWithPath:metallibPath];
     gLibrary = [gDevice newLibraryWithURL:metallibURL error:&err];
     if (!gLibrary || err)
@@ -123,8 +131,9 @@ extern "C" void computeQuadricsInParallel_Metal(TriMesh& _mesh, std::vector<QMat
     id<MTLBuffer> vertQuadBuf = [gDevice newBufferWithBytes:vertexQuadrics.data()
                                  length:vertexQuadrics.size() * sizeof(simd::float4x4)
                                  options:MTLResourceStorageModeShared];
-    // id<MTLBuffer> vertexQuadBuf = [gDevice newBufferWithLength:numVerts * sizeof(atomic_float) * 16
-    //                                                options:MTLResourceStorageModeShared];
+
+    id<MTLBuffer> debugLogBuffer = [gDevice newBufferWithLength:sizeof(simd_float4x4) * numFaces
+                                                    options:MTLResourceStorageModeShared];
 
     // For the uniform data like numFaces, using a "constant" avoids the overhead of creating and managing a buffer
     uint faceCount = (uint)numFaces;
@@ -133,6 +142,8 @@ extern "C" void computeQuadricsInParallel_Metal(TriMesh& _mesh, std::vector<QMat
     id<MTLCommandBuffer> cmdBuf = [gCommandQueue commandBuffer];
     id<MTLComputeCommandEncoder> encoder = [cmdBuf computeCommandEncoder];
     [encoder setComputePipelineState:faceQuadricPipeline];
+
+    [encoder setBuffer:debugLogBuffer offset:0 atIndex:4]; // Pass it to the kernel
 
     // set buffers (the argument indices match .metal kernel)
     [encoder setBuffer:facesBuf       offset:0 atIndex:0];                  // which verts form each face
@@ -148,7 +159,7 @@ extern "C" void computeQuadricsInParallel_Metal(TriMesh& _mesh, std::vector<QMat
         threadgroupSize = numFaces;
     }
 
-    [encoder dispatchThreadgroups:MTLSizeMake((numFaces + threadgroupSize - 1)/threadgroupSize, 1, 1)
+    [encoder dispatchThreadgroups:MTLSizeMake((numFaces + threadgroupSize - 1) / threadgroupSize, 1, 1)
           threadsPerThreadgroup:MTLSizeMake(threadgroupSize, 1, 1)];
 
     [encoder endEncoding];
@@ -171,6 +182,18 @@ extern "C" void computeQuadricsInParallel_Metal(TriMesh& _mesh, std::vector<QMat
 
     [cmdBuf commit];
     [cmdBuf waitUntilCompleted];
+
+    simd_float4x4* loggedKp = (simd_float4x4*)[debugLogBuffer contents];
+    for (size_t i = 0; i < numFaces; ++i) {
+        NSLog(@"Kp[%zu]:\n", i);
+        for (int r = 0; r < 4; ++r) {
+            NSLog(@"%f %f %f %f\n",
+                loggedKp[i].columns[0][r],
+                loggedKp[i].columns[1][r],
+                loggedKp[i].columns[2][r],
+                loggedKp[i].columns[3][r]);
+        }
+    }
 
     // Read back results
     simd::float4x4* finalVerts = (simd::float4x4*)vertQuadBuf.contents;
