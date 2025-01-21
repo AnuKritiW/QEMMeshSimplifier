@@ -53,6 +53,7 @@ void simplifyMeshByPercentage(TriMesh& _mesh, std::stack<TriMesh>& _meshHistory,
         tgtNumFaces = 1; // ensure at least one face remains
     }
 
+    freopen("/Users/Exhale/Desktop/CAVE/ASE/programming-project-AnuKritiW/output.log", "a+", stderr);
     QEMSimplifier simplifier;
     simplifier.simplifyMesh(_mesh, tgtNumFaces);
 
@@ -92,7 +93,7 @@ void displayMeshStatistics(const TriMesh& _mesh)
 int main()
 {
     TriMesh mesh;
-    std::string filename = "object-files/gourd.obj";
+    std::string filename = "../object-files/gourd.obj";
 
     if (!Parser::loadMesh(filename, mesh))
     {

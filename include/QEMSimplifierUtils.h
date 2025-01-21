@@ -1,12 +1,17 @@
 #ifndef QEMSIMPLIFIERUTILS_H_
 #define QEMSIMPLIFIERUTILS_H_
 
+#include "QEMSimplifierUtils_config.h"
 #include <OpenMesh/Core/IO/MeshIO.hh>
 #include <OpenMesh/Core/Mesh/TriMesh_ArrayKernelT.hh>
 #include <Eigen/Dense>
 
 typedef OpenMesh::TriMesh_ArrayKernelT<> TriMesh;
 typedef Eigen::Matrix4d QMatrix;
+
+#if defined(QEM_BACKEND_METAL)
+extern "C" void computeQuadricsInParallel_Metal(TriMesh& mesh, std::vector<QMatrix>& globalQuadrics);
+#endif
 
 class QEMSimplifierUtils
 {
