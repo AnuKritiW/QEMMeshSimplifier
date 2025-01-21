@@ -4,9 +4,25 @@
 
 \[Paper found [here](./References/Surface%20Simplification%20Using%20Quadric%20Error%20Metrics.pdf)\]
 
-* Produce high quality approximations of polygonal models
-* Iterative contractions of vertex pairs to simplify models
-* Maintains surface error approximations using quadric matrices
+This project implements a mesh simplification algorithm based on Quadric Error Metrics (QEM). It allows high-quality approximations of polygonal models through iterative vertex pair contractions. The program is designed for efficiency, with an emphasis on maintaining surface error approximations using quadric matrices.
+
+> ## Table of Contents:
+> - [Overview](#overview)
+> - [Build Instructions](#build-instructions)
+> - [Testing instructions](#testing-instructions)
+> - [UI](#ui)
+> - [Demo](#demo)
+> - [TODOs](#todos)
+
+## Overview
+* Simplifies polygonal models using Quadric Error Metrics (QEM).
+* Iterative contractions of vertex pairs to reduce model complexity.
+* Efficient handling of surface error approximations with quadric matrices.
+
+* Algorithm highlights:
+    1. Precompute quadrics for all vertices.
+    2. Calculate the optimal contraction target for each valid vertex pair.
+    3. Use a priority queue to iteratively simplify the mesh based on minimal error cost.
 
 * Algorithm:
     1. Compute the **Q** matrices for all initial vertices
@@ -14,95 +30,89 @@
     2. Select all valid pairs
     3. Compute the optimal contraction target <strong><span style="text-decoration:overline;">v</span></strong> for each valid pair <strong>(v<sub>1</sub>, v<sub>2</sub>)</strong>. The error <strong>
   <span style="text-decoration:overline;">v</span><sup>T</sup> (Q<sub>1</sub> + Q<sub>2</sub>) <span style="text-decoration:overline;">v</span></strong> of this target vertex becomes the _cost_ of contracting that pair.
-    4. Place all the pairs in a heap keyed on cost with the minimum cost pair at the top
-    5. Iteratively remove the pair <strong>(v<sub>1</sub>, v<sub>2</sub>)</strong> of least cost from the heap, constract this pair, and update the costs of all valid pairs involving <strong>v<sub>1</sub></strong>
+    1. Place all the pairs in a heap keyed on cost with the minimum cost pair at the top
+    2. Iteratively remove the pair <strong>(v<sub>1</sub>, v<sub>2</sub>)</strong> of least cost from the heap, constract this pair, and update the costs of all valid pairs involving <strong>v<sub>1</sub></strong>
 </strong>
 
-* Psuedo-ish code
-```
-Function simplifyMesh(mesh, targetFaces):
-    # Precompute vertex quadrics
-    computeQuadrics(mesh)
+## Build Instructions
 
-    # Initialize priority queue (min-heap) for edges
-    Declare priority queue, pq
-    For each edge e in the mesh:
-        computeEdgeCollapseCost(mesh, e) --> optimal position; collapse cost
-        Create EdgeInfo(edgeHandle, cost, optpos)
-        pq.insert(EdgeInfo)
+1. **Clone the Repository**
+    ```
+    git clone git@github.com:NCCA/programming-project-AnuKritiW.git
+    cd programming-project-AnuKritiW
+    ```
 
-    # Simplify mesh
-    While (numFaces in mesh > targetFaces) && (!pq.empty()):
-        # Pop the edge with the smallest cost
-        topEdge = pq.pop()
+2. **Install Dependencies** The project currently requires the following dependencies to be installed manually:
+    * Eigen: For linear algebra computations.
+    * OpenMesh: For mesh processing.
+    * CMake: For build system configuration.
 
-        # Attempt to collapse the edge
-        If !collapseEdge(mesh, topEdge.edgeHandle, topEdge.optimalPos):
-            continue;
+    Ensure these libraries are installed on your system before building the project.
 
-        # Rebuild the priority queue after the collapse
-        Remove deleted elements
-        Clear the priority queue
+3. **Build the Project** Run the following commands to configure and build the project:
+    ```
+    mkdir build && cd build
+    cmake ..
+    make
+    ./QEMSimplifier
+    ```
 
-        For each remaining edge e in the mesh:
-            If e is deleted, skip
-            Ensure the quadric property exists for vertices
-            Compute the cost and optimal position for e using computeEdgeCollapseCost
-            Create EdgeInfo object and insert into pq
+4. **Metal build (Optional)**
 
-    # Cleanup
-End Function
+    If building with Metal support, use the following CMake command instead:
+    ```
+    cmake -DUSE_METAL=ON ..
+    make
+    ./QEMSimplifier
+    ```
 
-Function computeEdgeCollapseCost(mesh, edgeHandle, optPos):
+## Testing instructions
 
-    Get verts of the edge -- v0, v1
+The project includes multiple test executables to validate its functionality:
 
-    # Sum the quadrics of the two vertices
-    Q = mesh.property(vQuadric, v0) + mesh.property(vQuadric, v1)
+1. **Run All Tests** From the build directory, you can run all the tests using:
+    ```
+    ./MainTests
+    ```
+2. **Run Specific Tests** The tests are divided into the following executables:
+    * `MainTests`
+    * `ParserTests`
+    * `QEMSimplifierTests`
+    * `QEMSimplifierUtilsTests`
 
-    # Q = [ A  b ]
-    #     [ b^T c ]
-    # where:
-    # - A is a 3x3 matrix (top-left block of Q).
-    # - b is a 3x1 vector (the last column of Q, excluding the bottom-right element).
-    # - c is a scalar (bottom-right element of Q).
+    To run specific test executables directly:
+    ```
+    ./tests/MainTests
+    ./tests/ParserTests
+    ./tests/QEMSimplifierTests
+    ./tests/QEMSimplifierUtilsTests
+    ```
+3. **Run Smaller Tests in Parallel** To execute specific tests in parallel, you can use the following `ctest` command:
+    ```
+    ctest --output-on-failure -j11 --tests-regex "ParserTests|QEMSimplifierUtilsTests|QEMSimplifierTests"
+    ```
+    This approach runs only the specified test executables in parallel, speeding up the testing process.
 
-    A = top-left 3x3 block of Q
-    b = [ -Q(0,3), -Q(1,3), -Q(2,3) ]^T
+## UI
 
-    # Solve for the optimal position (vOpt) that minimizes Error(v) = v^T * Q * v
-    # Expand the error function by subbing in Q, then minimze error to get the eqn (A * v_xyz = -b)
+![image](./References/screenshots/ui.png)
 
-    vOpt = A.inverse() * b
+## Demo
 
-    # Compute the collapse cost = vOpt^T * Q * vOpt
-    v4 = [ vOpt[0], vOpt[1], vOpt[2], 1.0 ]
-    cost = v4^T * Q * v4
+*** link to demo video ***
 
-    # Output the optimal position and return the cost
-    optPos = vOpt
-    Return cost
-End Function
+Here are some results of mesh simplification using this program:
 
-```
 
-Results as of 30 Dec 2024:
+| Simplification Level | Screenshot                                           |
+| -------------------- | ---------------------------------------------------- |
+| Original             | ![image](./References/screenshots/screenshot_00.png) |
+| 25%                  | ![image](./References/screenshots/screenshot_25.png) |
+| 50%                  | ![image](./References/screenshots/screenshot_50.png) |
+| 75%                  | ![image](./References/screenshots/screenshot_75.png) |
+| 90%                  | ![image](./References/screenshots/screenshot_90.png) |
 
-Original gourd:
+## TODOs
 
-![image](./References/gourd-original.png)
-
-200 faces:
-
-![image](./References/gourd-200faces.png)
-
-100 faces:
-
-![image](./References/gourd-100faces.png)
-
-TODOs:
-- optimization (is there a way to update priQ without clearing and repopulating; is it better?)
-- Add button in polyscope viewer to simplify to n faces in real time.
-- Test with more objects
-- Abstract out test cases if possible to clean up tests
-- Write tests for overall simplify method(?)
+* Have CMakeLists fetch dependencies
+* Add button in polyscope viewer to simplify to n faces in real time.
