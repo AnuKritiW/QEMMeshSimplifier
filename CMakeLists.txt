@@ -153,11 +153,15 @@ set(GTEST_INCLUDE_DIR /Users/Exhale/Desktop/CAVE/ASE/dependencies/googletest/goo
 include(GoogleTest)
 enable_testing()
 
-# Add the test executable
-add_executable(QEMSimplifierTests)
+#################################################################################
+# Main executable for all tests
+#################################################################################
 
-# Source files for tests
-target_sources(QEMSimplifierTests PRIVATE
+# Add the test executable + Source files for tests
+add_executable(MainTests
+    tests/MainTests.cpp
+    tests/ParserTests.cpp
+    tests/QEMSimplifierUtilsTests.cpp
     tests/QEMSimplifierTests.cpp
     src/parser.cpp
     src/QEMSimplifier.cpp
@@ -165,16 +169,15 @@ target_sources(QEMSimplifierTests PRIVATE
 )
 
 # Include directories for tests
-target_include_directories(QEMSimplifierTests PRIVATE
+target_include_directories(MainTests PRIVATE
     include
     ${EIGEN_DIR}
-    ${GTEST_INCLUDE_DIRS}
+    ${GTEST_INCLUDE_DIR}
 )
 
 # Link libraries for the test executable
-# target_link_directories(QEMSimplifierTests PRIVATE ${OPENMESH_LIB_DIR})
-target_link_directories(QEMSimplifierTests PRIVATE ${OPENMESH_LIB_DIR} ${GTEST_LIB_DIR})
-target_link_libraries(QEMSimplifierTests PRIVATE
+target_link_directories(MainTests PRIVATE ${OPENMESH_LIB_DIR} ${GTEST_LIB_DIR})
+target_link_libraries(MainTests PRIVATE
     gtest
     gtest_main
     OpenMeshCore
@@ -184,29 +187,108 @@ target_link_libraries(QEMSimplifierTests PRIVATE
 # Metal-specific configurations for tests
 if(USE_METAL)
     # Include Metal bridging file
-    target_sources(QEMSimplifierTests PRIVATE src/QEMSimplifierUtils_metal.mm)
+    target_sources(MainTests PRIVATE src/QEMSimplifierUtils_metal.mm)
 
     # Add dependency on the Metal library
-    add_dependencies(QEMSimplifierTests QEMSimplifierUtilsKernelMetallib)
+    add_dependencies(MainTests QEMSimplifierUtilsKernelMetallib)
 
     # Link Metal and MetalKit frameworks
-    target_link_libraries(QEMSimplifierTests PRIVATE ${METAL_FRAMEWORK} ${METALKIT_FRAMEWORK})
+    target_link_libraries(MainTests PRIVATE ${METAL_FRAMEWORK} ${METALKIT_FRAMEWORK})
 
     # Link Objective-C runtime libraries
     find_library(FOUNDATION_FRAMEWORK Foundation)
     find_library(COREFRAMEWORK CoreFoundation)
-    target_link_libraries(QEMSimplifierTests PRIVATE ${FOUNDATION_FRAMEWORK} ${COREFRAMEWORK})
+    target_link_libraries(MainTests PRIVATE ${FOUNDATION_FRAMEWORK} ${COREFRAMEWORK})
 
     # Ensure Objective-C++ compilation
     set_source_files_properties(src/QEMSimplifierUtils_metal.mm PROPERTIES COMPILE_FLAGS "-x objective-c++")
 
     target_compile_definitions(
-      QEMSimplifierTests
+      MainTests
       PRIVATE
       CMAKE_METALLIB_PATH=\"${CMAKE_CURRENT_BINARY_DIR}/QEMSimplifierUtilsKernel.metallib\"
     )
-
 endif()
+
+add_test(NAME MainTests COMMAND MainTests)
+
+
+#################################################################################
+# Individual executables for each test file
+#################################################################################
+
+# ParserTests executable
+add_executable(ParserTests
+    tests/MainTests.cpp
+    tests/ParserTests.cpp
+    src/parser.cpp
+)
+
+target_include_directories(ParserTests PRIVATE
+    include
+    ${EIGEN_DIR}
+    ${GTEST_INCLUDE_DIR}
+)
+
+target_link_directories(ParserTests PRIVATE ${OPENMESH_LIB_DIR} ${GTEST_LIB_DIR})
+target_link_libraries(ParserTests PRIVATE
+    gtest
+    gtest_main
+    OpenMeshCore
+    OpenMeshTools
+)
+
+add_test(NAME ParserTests COMMAND ParserTests)
+
+# QEMSimplifierUtilsTests executable
+add_executable(QEMSimplifierUtilsTests
+    tests/MainTests.cpp
+    tests/QEMSimplifierUtilsTests.cpp
+    src/QEMSimplifierUtils.cpp
+)
+
+target_include_directories(QEMSimplifierUtilsTests PRIVATE
+    include
+    ${EIGEN_DIR}
+    ${GTEST_INCLUDE_DIR}
+)
+
+target_link_directories(QEMSimplifierUtilsTests PRIVATE ${OPENMESH_LIB_DIR} ${GTEST_LIB_DIR})
+target_link_libraries(QEMSimplifierUtilsTests PRIVATE
+    gtest
+    gtest_main
+    OpenMeshCore
+    OpenMeshTools
+)
+
+add_test(NAME QEMSimplifierUtilsTests COMMAND QEMSimplifierUtilsTests)
+
+# QEMSimplifierTests executable
+add_executable(QEMSimplifierTests
+    tests/MainTests.cpp
+    tests/QEMSimplifierTests.cpp
+    src/parser.cpp
+    src/QEMSimplifier.cpp
+    src/QEMSimplifierUtils.cpp
+)
+
+target_include_directories(QEMSimplifierTests PRIVATE
+    include
+    ${EIGEN_DIR}
+    ${GTEST_INCLUDE_DIR}
+)
+
+target_link_directories(QEMSimplifierTests PRIVATE ${OPENMESH_LIB_DIR} ${GTEST_LIB_DIR})
+target_link_libraries(QEMSimplifierTests PRIVATE
+    gtest
+    gtest_main
+    OpenMeshCore
+    OpenMeshTools
+)
+
+add_test(NAME QEMSimplifierTests COMMAND QEMSimplifierTests)
+
+########
 
 # Automatically discover and register tests
 enable_testing()
