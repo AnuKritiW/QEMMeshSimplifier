@@ -36,7 +36,8 @@ set(POLYSCOPE_DIR /Users/Exhale/Desktop/CAVE/ASE/dependencies/polyscope)
 # set(EIGEN_DIR /home/s5647918/Code/dependencies/eigen)
 set(EIGEN_DIR /Users/Exhale/Desktop/CAVE/ASE/dependencies/eigen)
 
-set(TINYFILEDIALOGS_DIR /Users/Exhale/Desktop/CAVE/ASE/dependencies/tinyfiledialogs)
+# set(TINYFILEDIALOGS_DIR /Users/Exhale/Desktop/CAVE/ASE/dependencies/tinyfiledialogs)
+set(TINYFILEDIALOGS_DIR ${CMAKE_SOURCE_DIR}/dependencies/tinyfiledialogs)
 
 #################################################################################
 # Main executable: QEMSimplifier
@@ -76,6 +77,13 @@ target_link_libraries(QEMSimplifier PRIVATE OpenMeshCore OpenMeshTools)
 # Add Polyscope subdirectory and link Polyscope to the executable
 add_subdirectory(${POLYSCOPE_DIR} ${CMAKE_BINARY_DIR}/polyscope_build)
 target_link_libraries(QEMSimplifier PRIVATE polyscope)
+
+# Add tinyfiledialogs as a static library
+add_library(tinyfiledialogs STATIC
+    ${TINYFILEDIALOGS_DIR}/tinyfiledialogs.c
+)
+target_include_directories(tinyfiledialogs PUBLIC ${TINYFILEDIALOGS_DIR})
+target_link_libraries(QEMSimplifier PRIVATE tinyfiledialogs)
 
 ###############################################################################
 # Metal GPU Backend (Optional)
