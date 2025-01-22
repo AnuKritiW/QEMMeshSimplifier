@@ -11,9 +11,10 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
+        build_type: [CPU, Metal]
         suite: [ParserTests, QEMSimplifierUtilsTests, QEMSimplifierTests]
 
-    name: Run ${{ matrix.suite }}
+    name: Run ${{ matrix.build_type }} ${{ matrix.suite }}
 
     steps:
       # Step 1: Checkout Code
@@ -25,11 +26,11 @@ jobs:
         uses: actions/cache@v3
         with:
           path: |
-            build
+            build-${{ matrix.build_type }}
             ~/.cmake/packages
-          key: cmake-cache-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
+          key: cmake-cache-${{ matrix.build_type }}-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
           restore-keys: |
-            cmake-cache-${{ runner.os }}-
+            cmake-cache-${{ matrix.build_type }}-${{ runner.os }}-
 
       # Step 3: Install System Dependencies
       - name: Install System Dependencies
@@ -52,16 +53,20 @@ jobs:
       # Step 4: Configure CMake
       - name: Configure CMake
         run: |
-          mkdir -p build && cd build
-          cmake -DCMAKE_BUILD_TYPE=Release ..
+          mkdir -p build-${{ matrix.build_type }} && cd build-${{ matrix.build_type }}
+          if [ "${{ matrix.build_type }}" == "Metal" ]; then
+            cmake -DUSE_METAL=ON -DCMAKE_BUILD_TYPE=Release ..
+          else
+            cmake -DCMAKE_BUILD_TYPE=Release ..
+          fi
 
       # Step 5: Build the Project
       - name: Build the Project
         run: |
-          cmake --build build -- -j$(nproc)
+          cmake --build build-${{ matrix.build_type }} -- -j$(nproc)
 
       # Step 6: Run the Test Suite
       - name: Run Test Suite
         run: |
-          cd build
+          cd build-${{ matrix.build_type }}
           ctest --output-on-failure --tests-regex "${{ matrix.suite }}"
