@@ -59,7 +59,7 @@ set(TINYFILEDIALOGS_DIR ${CMAKE_SOURCE_DIR}/dependencies/tinyfiledialogs)
 # Add the executable and its source files
 add_executable(QEMSimplifier)
 
-find_package(OpenMesh REQUIRED)
+# find_package(OpenMesh REQUIRED)
 
 # Source files for the main project
 target_sources(QEMSimplifier PRIVATE
