@@ -26,18 +26,31 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v3
 
-      # # Step 2: Set Up Cache
-      # - name: Cache CMake Files
-      #   uses: actions/cache@v3
-      #   with:
-      #     path: |
-      #       build-${{ matrix.build_type }}
-      #       ~/.cmake/packages
-      #     key: cmake-cache-${{ matrix.build_type }}-${{ runner.runs-on }}-${{ hashFiles('CMakeLists.txt') }}
-      #     restore-keys: |
-      #       cmake-cache-${{ matrix.build_type }}-${{ runner.runs-on }}-
+      # Step 2: Cache Dependencies
+      - name: Cache Dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cmake/packages
+          key: cmake-dependencies-${{ runner.os }}
+          restore-keys: |
+            cmake-dependencies-
 
-      # Step 3 (CPU): Install System Dependencies
+      # Step 3: Cache Build Directory
+      - name: Cache Build Directory
+        uses: actions/cache@v3
+        with:
+          path: build-${{ matrix.build_type }}
+          key: cmake-build-${{ matrix.build_type }}-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', '**/*.cpp', '**/*.h') }}
+          restore-keys: |
+            cmake-build-${{ matrix.build_type }}-${{ runner.os }}-
+
+      # Step 4: Clear CMake Cache
+      - name: Clear CMake Cache
+        run: |
+          rm -f build-${{ matrix.build_type }}/CMakeCache.txt
+          rm -rf build-${{ matrix.build_type }}/CMakeFiles
+
+      # Step 5a (CPU): Install System Dependencies
       - name: Install System Dependencies
         if: matrix.runs-on == 'ubuntu-latest'
         run: |
@@ -56,7 +69,7 @@ jobs:
             libxinerama-dev \
             libxcursor-dev
 
-      # Step 3 (Metal): Install System Dependencies
+      # Step 5b (Metal): Install System Dependencies
       - name: Install System Dependencies
         if: matrix.runs-on == 'macos-latest'
         run: |
@@ -69,7 +82,7 @@ jobs:
       - name: Print Python version
         run: python3 --version
 
-      # Step 4: Configure CMake
+      # Step 6: Configure CMake
       - name: Configure CMake
         run: |
           mkdir -p build-${{ matrix.build_type }} && cd build-${{ matrix.build_type }}
@@ -79,12 +92,12 @@ jobs:
             cmake -DCMAKE_BUILD_TYPE=Release ..
           fi
 
-      # Step 5: Build the Project
+      # Step 7: Build the Project
       - name: Build the Project
         run: |
           cmake --build build-${{ matrix.build_type }} -- -j$(nproc)
 
-      # Step 6: Run the Test Suite
+      # Step 8: Run the Test Suite
       - name: Run Test Suite
         run: |
           cd build-${{ matrix.build_type }}
