@@ -53,6 +53,7 @@ This project implements a mesh simplification algorithm based on Quadric Error M
     ```
     mkdir build && cd build
     cmake ..
+    cmake --build . -- -j$(nproc)
     make
     ./QEMSimplifier
     ```
@@ -62,6 +63,7 @@ This project implements a mesh simplification algorithm based on Quadric Error M
     If building with Metal support, use the following CMake command instead:
     ```
     cmake -DUSE_METAL=ON ..
+    cmake --build . -- -j$(nproc)
     make
     ./QEMSimplifier
     ```
