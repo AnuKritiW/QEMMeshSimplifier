@@ -1,0 +1,67 @@
+name: GTest CI
+
+on:
+  push:
+    branches: [github-actions]
+  pull_request:
+    branches: [github-actions]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        suite: [ParserTests, QEMSimplifierUtilsTests, QEMSimplifierTests]
+
+    name: Run ${{ matrix.suite }}
+
+    steps:
+      # Step 1: Checkout Code
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # Step 2: Set Up Cache
+      - name: Cache CMake Files
+        uses: actions/cache@v3
+        with:
+          path: |
+            build
+            ~/.cmake/packages
+          key: cmake-cache-${{ runner.os }}-${{ hashFiles('CMakeLists.txt') }}
+          restore-keys: |
+            cmake-cache-${{ runner.os }}-
+
+      # Step 3: Install System Dependencies
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            cmake \
+            git \
+            wget \
+            libglfw3-dev \
+            libglew-dev \
+            freeglut3-dev \
+            libx11-dev \
+            libxi-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxcursor-dev
+
+      # Step 4: Configure CMake
+      - name: Configure CMake
+        run: |
+          mkdir -p build && cd build
+          cmake -DCMAKE_BUILD_TYPE=Release ..
+
+      # Step 5: Build the Project
+      - name: Build the Project
+        run: |
+          cmake --build build -- -j$(nproc)
+
+      # Step 6: Run the Test Suite
+      - name: Run Test Suite
+        run: |
+          cd build
+          ctest --output-on-failure --tests-regex "${{ matrix.suite }}"
