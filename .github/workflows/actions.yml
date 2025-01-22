@@ -36,7 +36,7 @@ jobs:
       - name: Install System Dependencies
         run: |
           brew update
-          brew install cmake glfw glew freeglut
+          brew install --formula cmake glfw glew freeglut
 
       # - name: Install System Dependencies
       #   run: |
