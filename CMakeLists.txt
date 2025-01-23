@@ -25,10 +25,6 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(OpenMesh)
 
-# OpenMesh setup
-# set(OPENMESH_INCLUDE_DIR /Users/Exhale/Desktop/CAVE/ASE/dependencies/OpenMesh/include)
-# set(OPENMESH_LIB_DIR /Users/Exhale/Desktop/CAVE/ASE/dependencies/OpenMesh/build/Build/lib)
-
 # Fetch Polyscope
 FetchContent_Declare(
     Polyscope
@@ -37,18 +33,12 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(Polyscope)
 
-# Polyscope setup
-# set(POLYSCOPE_DIR /Users/Exhale/Desktop/CAVE/ASE/dependencies/polyscope)
-
 # Fetch Eigen
 FetchContent_Declare(
     Eigen
     URL https://gitlab.com/libeigen/eigen/-/archive/3.4.0/eigen-3.4.0.tar.gz
 )
 FetchContent_MakeAvailable(Eigen)
-
-# Eigen setup
-# set(EIGEN_DIR /Users/Exhale/Desktop/CAVE/ASE/dependencies/eigen)
 
 set(TINYFILEDIALOGS_DIR ${CMAKE_SOURCE_DIR}/dependencies/tinyfiledialogs)
 
@@ -83,21 +73,11 @@ target_include_directories(QEMSimplifier PRIVATE
     include
 )
 
-# # Include directories for the executable
-# target_include_directories(QEMSimplifier PRIVATE
-#    ${OPENMESH_INCLUDE_DIR}
-#    ${OPENMESH_INCLUDE_DIR}/OpenMesh/Core
-#    ${EIGEN_DIR}
-#    ${TINYFILEDIALOGS_DIR}
-#    include
-# )
-
 # Link OpenMesh libraries
 target_link_directories(QEMSimplifier PRIVATE ${OPENMESH_LIB_DIR})
 target_link_libraries(QEMSimplifier PRIVATE OpenMeshCore OpenMeshTools)
 
-# Add Polyscope subdirectory and link Polyscope to the executable
-# add_subdirectory(${POLYSCOPE_DIR} ${CMAKE_BINARY_DIR}/polyscope_build)
+# Link Polyscope to the executable
 target_link_libraries(QEMSimplifier PRIVATE polyscope)
 
 # Add tinyfiledialogs as a static library
@@ -161,8 +141,6 @@ if(USE_METAL)
   # Ensure main target depends on the metallib build
   add_dependencies(QEMSimplifier QEMSimplifierUtilsKernelMetallib)
   message("CMAKE_CURRENT_BINARY_DIR: ${CMAKE_CURRENT_BINARY_DIR}")
-  # target_compile_definitions(QEMSimplifier PRIVATE CMAKE_METALLIB_PATH="${CMAKE_CURRENT_BINARY_DIR}/QEMSimplifierUtilsKernel.metallib")
-  # target_compile_definitions(QEMSimplifier PRIVATE CMAKE_METALLIB_PATH="${CMAKE_CURRENT_BINARY_DIR}/QEMSimplifierUtilsKernel.metallib")
   target_compile_definitions(
     QEMSimplifier
     PRIVATE
@@ -182,12 +160,7 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(GoogleTest)
 
-# Set GTest paths manually
-# set(GTEST_LIB_DIR /Users/Exhale/Desktop/CAVE/ASE/dependencies/googletest/build/lib)
-# set(GTEST_INCLUDE_DIR /Users/Exhale/Desktop/CAVE/ASE/dependencies/googletest/googletest/include)
-
-# Find and include Google Test
-# find_package(GTest CONFIG REQUIRED)
+# Include Google Test
 include(GoogleTest)
 enable_testing()
 
@@ -247,8 +220,6 @@ target_include_directories(ParserTests PRIVATE
     include
     ${eigen_SOURCE_DIR}
     ${GoogleTest_SOURCE_DIR}/googletest/include
-    # ${EIGEN_DIR}
-    # ${GTEST_INCLUDE_DIR}
 )
 
 # target_link_directories(ParserTests PRIVATE ${OPENMESH_LIB_DIR} ${GTEST_LIB_DIR})
@@ -273,8 +244,6 @@ target_include_directories(QEMSimplifierUtilsTests PRIVATE
     include
     ${eigen_SOURCE_DIR}
     ${GoogleTest_SOURCE_DIR}/googletest/include
-    # ${EIGEN_DIR}
-    # ${GTEST_INCLUDE_DIR}
 )
 
 # target_link_directories(QEMSimplifierUtilsTests PRIVATE ${OPENMESH_LIB_DIR} ${GTEST_LIB_DIR})
@@ -301,11 +270,8 @@ target_include_directories(QEMSimplifierTests PRIVATE
     include
     ${eigen_SOURCE_DIR}
     ${GoogleTest_SOURCE_DIR}/googletest/include
-    # ${EIGEN_DIR}
-    # ${GTEST_INCLUDE_DIR}
 )
 
-# target_link_directories(QEMSimplifierTests PRIVATE ${OPENMESH_LIB_DIR} ${GTEST_LIB_DIR})
 target_link_libraries(QEMSimplifierTests PRIVATE
     gtest
     gtest_main
@@ -317,7 +283,6 @@ target_compile_definitions(QEMSimplifierTests PRIVATE UNIT_TEST)
 add_test(NAME QEMSimplifierTests COMMAND QEMSimplifierTests)
 
 ########
-
 
 # Metal-specific configurations for tests
 if(USE_METAL)
