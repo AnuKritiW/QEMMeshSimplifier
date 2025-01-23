@@ -1,0 +1,120 @@
+name: GTest CI
+
+on:
+  push:
+    branches: [main, github-actions]
+  pull_request:
+    branches: [main, github-actions]
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        runs-on: [ubuntu-latest, macos-latest]
+        build_type: [CPU, Metal]
+        suite: [ParserTests, QEMSimplifierUtilsTests, QEMSimplifierTests]
+        exclude:
+          - runs-on: ubuntu-latest
+            build_type: Metal
+
+    name: Run ${{ matrix.build_type }} on ${{ matrix.runs-on }} - ${{ matrix.suite }}
+
+    runs-on: ${{ matrix.runs-on }}
+
+    steps:
+      # Step 1: Checkout Code
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # Step 2: Cache Dependencies
+      - name: Cache Dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cmake/packages
+          key: cmake-dependencies-${{ runner.os }}
+          restore-keys: |
+            cmake-dependencies-
+
+      # Step 3: Cache Build Directory
+      - name: Cache Build Directory
+        uses: actions/cache@v3
+        with:
+          path: build-${{ matrix.build_type }}
+          key: cmake-build-${{ matrix.build_type }}-${{ runner.os }}-${{ hashFiles('CMakeLists.txt', '**/*.cpp', '**/*.h') }}
+          restore-keys: |
+            cmake-build-${{ matrix.build_type }}-${{ runner.os }}-
+
+      # Step 4: Clear CMake Cache
+      - name: Clear CMake Cache
+        run: |
+          rm -f build-${{ matrix.build_type }}/CMakeCache.txt
+          rm -rf build-${{ matrix.build_type }}/CMakeFiles
+
+      # Step 5a (CPU): Install System Dependencies
+      - name: Install System Dependencies
+        if: matrix.runs-on == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          # Check if CMake is installed and up-to-date
+          cmake_version=$(cmake --version 2>/dev/null | head -n 1 | awk '{print $3}')
+          if [ "$cmake_version" != "3.31.4" ]; then
+            sudo apt-get install -y cmake
+          fi
+          sudo apt-get install -y \
+            build-essential \
+            git \
+            wget \
+            libglfw3-dev \
+            libglew-dev \
+            freeglut3-dev \
+            libx11-dev \
+            libxi-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxcursor-dev
+
+      # Step 5b (Metal): Install System Dependencies
+      - name: Install System Dependencies
+        if: matrix.runs-on == 'macos-latest'
+        run: |
+          brew update
+          # Check if CMake is installed
+          if ! brew list cmake &>/dev/null; then
+            brew install cmake
+          fi
+          if ! brew list glfw &>/dev/null; then
+            brew install glfw
+          fi
+          if ! brew list glew &>/dev/null; then
+            brew install glew
+          fi
+          if ! brew list freeglut &>/dev/null; then
+            brew install freeglut
+          fi
+
+      - name: Print CMake version
+        run: cmake --version
+
+      - name: Print Python version
+        run: python3 --version
+
+      # Step 6: Configure CMake
+      - name: Configure CMake
+        run: |
+          mkdir -p build-${{ matrix.build_type }} && cd build-${{ matrix.build_type }}
+          if [ "${{ matrix.build_type }}" == "Metal" ]; then
+            cmake -DUSE_METAL=ON -DCMAKE_BUILD_TYPE=Release ..
+          else
+            cmake -DCMAKE_BUILD_TYPE=Release ..
+          fi
+
+      # Step 7: Build the Project
+      - name: Build the Project
+        run: |
+          cmake --build build-${{ matrix.build_type }} -- -j$(nproc)
+
+      # Step 8: Run the Test Suite
+      - name: Run Test Suite
+        run: |
+          cd build-${{ matrix.build_type }}
+          ctest --output-on-failure --tests-regex "${{ matrix.suite }}"
