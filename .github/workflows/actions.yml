@@ -55,9 +55,13 @@ jobs:
         if: matrix.runs-on == 'ubuntu-latest'
         run: |
           sudo apt-get update
+          # Check if CMake is installed and up-to-date
+          cmake_version=$(cmake --version 2>/dev/null | head -n 1 | awk '{print $3}')
+          if [ "$cmake_version" != "3.31.4" ]; then
+            sudo apt-get install -y cmake
+          fi
           sudo apt-get install -y \
             build-essential \
-            cmake \
             git \
             wget \
             libglfw3-dev \
@@ -74,7 +78,19 @@ jobs:
         if: matrix.runs-on == 'macos-latest'
         run: |
           brew update
-          brew install --formula cmake glfw glew freeglut
+          # Check if CMake is installed
+          if ! brew list cmake &>/dev/null; then
+            brew install cmake
+          fi
+          if ! brew list glfw &>/dev/null; then
+            brew install glfw
+          fi
+          if ! brew list glew &>/dev/null; then
+            brew install glew
+          fi
+          if ! brew list freeglut &>/dev/null; then
+            brew install freeglut
+          fi
 
       - name: Print CMake version
         run: cmake --version
