@@ -2,9 +2,9 @@ name: GTest CI
 
 on:
   push:
-    branches: [github-actions]
+    branches: [main, github-actions]
   pull_request:
-    branches: [github-actions]
+    branches: [main, github-actions]
 
 jobs:
   test:
