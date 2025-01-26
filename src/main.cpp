@@ -131,6 +131,8 @@ int main()
 
         ImGui::Text("Simplification Settings");
         ImGui::SliderFloat("Percentage to Simplify", &simplifyPercentage, 0.0f, 100.0f, "%.1f%%");
+        ImGui::InputFloat("Set Percentage", &simplifyPercentage, 5.0f, 10.0f, "%.1f");
+        simplifyPercentage = std::clamp(simplifyPercentage, 0.0f, 100.0f);
 
         // Simplify
         if (ImGui::Button("Simplify Mesh"))
