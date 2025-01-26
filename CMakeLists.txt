@@ -85,21 +85,29 @@ add_library(tinyfiledialogs STATIC
 target_include_directories(tinyfiledialogs PUBLIC ${TINYFILEDIALOGS_DIR})
 target_link_libraries(QEMSimplifier PRIVATE tinyfiledialogs)
 
-if(APPLE)
-    set(LIBOMP_INCLUDE_DIR "/usr/local/include")
-    set(LIBOMP_LIBRARY "/usr/local/lib/libomp.dylib")
+###############################################################################
+# OpenMP (Optional)
+###############################################################################
 
-    target_include_directories(QEMSimplifier PRIVATE ${LIBOMP_INCLUDE_DIR})
-    target_link_libraries(QEMSimplifier PRIVATE ${LIBOMP_LIBRARY})
+option(USE_OPENMP "Enable OpenMP support for multithreading" OFF)
 
-    target_compile_options(QEMSimplifier PRIVATE -Xpreprocessor -fopenmp)
-    target_link_options(QEMSimplifier PRIVATE -L/usr/local/lib -lomp)
-endif()
+if (USE_OPENMP)
+    if(APPLE)
+        set(LIBOMP_INCLUDE_DIR "/usr/local/include")
+        set(LIBOMP_LIBRARY "/usr/local/lib/libomp.dylib")
 
-find_package(OpenMP REQUIRED)
-if(OpenMP_CXX_FOUND)
-    target_compile_options(QEMSimplifier PRIVATE ${OpenMP_CXX_FLAGS})
-    target_link_libraries(QEMSimplifier PRIVATE ${OpenMP_omp_LIBRARY})
+        target_include_directories(QEMSimplifier PRIVATE ${LIBOMP_INCLUDE_DIR})
+        target_link_libraries(QEMSimplifier PRIVATE ${LIBOMP_LIBRARY})
+
+        target_compile_options(QEMSimplifier PRIVATE -Xpreprocessor -fopenmp)
+        target_link_options(QEMSimplifier PRIVATE -L/usr/local/lib -lomp)
+    endif()
+
+    find_package(OpenMP REQUIRED)
+    if(OpenMP_CXX_FOUND)
+        target_compile_options(QEMSimplifier PRIVATE ${OpenMP_CXX_FLAGS})
+        target_link_libraries(QEMSimplifier PRIVATE ${OpenMP_omp_LIBRARY})
+    endif()
 endif()
 
 ###############################################################################
