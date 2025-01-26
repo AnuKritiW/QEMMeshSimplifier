@@ -8,6 +8,7 @@ This project implements a mesh simplification algorithm based on Quadric Error M
 
 > ## Table of Contents:
 > - [Overview](#overview)
+> - [UML Diagrams](#uml-diagrams)
 > - [Build Instructions](#build-instructions)
 > - [Testing instructions](#testing-instructions)
 > - [UI](#ui)
@@ -33,6 +34,18 @@ This project implements a mesh simplification algorithm based on Quadric Error M
     1. Place all the pairs in a heap keyed on cost with the minimum cost pair at the top
     2. Iteratively remove the pair <strong>(v<sub>1</sub>, v<sub>2</sub>)</strong> of least cost from the heap, constract this pair, and update the costs of all valid pairs involving <strong>v<sub>1</sub></strong>
 </strong>
+
+## UML-diagrams
+
+### Class Diagram
+Source code found [here](./uml/class-diagram.puml)
+
+![image](./uml/class-diagram.png)
+
+### Sequence Diagram:
+Source code found [here](./uml/seq-diagram.puml)
+
+![image](./uml/seq-diagram.png)
 
 ## Build Instructions
 
