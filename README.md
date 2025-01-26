@@ -63,8 +63,15 @@ Markup source [here](./uml/seq-diagram.puml)
     * **OpenMesh**: For mesh processing.
     * **Polyscope**: For the graphical user interface (GUI).
     * **tinyfiledialogs**: For file dialog and explorer capabilities.
+    * **OpenMP**: Enables parallel computation to improve performance on multi-core systems.
+        * **macOS**: Ensure the OpenMP runtime (libomp) is installed. You can install it via Homebrew:
+            ```
+            brew install libomp
+            ```
+        * **Linux**: Most GCC and Clang distributions include OpenMP support by default.
+        * **Windows**: OpenMP is included in most recent versions of MSVC.
     * **GoogleTest (GTest)**: For unit testing.
-    * **Metal** (macOS only): Used for GPU-accelerated computations when the {USE_METAL} option is enabled. This feature requires macOS and the Metal framework.
+    * **Metal** (macOS only): Used for GPU-accelerated computations when the `{USE_METAL}` option is enabled. This feature requires macOS and the Metal framework.
 
 3. **Build the Project** Run the following commands to configure and build the project:
     ```
