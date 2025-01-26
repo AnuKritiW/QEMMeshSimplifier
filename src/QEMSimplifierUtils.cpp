@@ -59,25 +59,42 @@ void QEMSimplifierUtils::computeQuadricsInParallel(TriMesh& _mesh, std::vector<Q
         faceHandles.push_back(*f_it);
     }
 
-    // Enable parallelization
-
     /**
-     * Create a private copy of globalQuadrics for each thread.
-     * Perform independent computations in parallel for each thread.
-     * Combine the results at the end into the shared globalQuadrics array.
+     * Perform parallel computation of face quadrics and accumulate the results
+     * into the shared _globalQuadrics array using thread-local buffers.
+     *
+     * Steps:
+     * 1. Create a thread-local copy of localQuadrics for each thread to avoid
+     *    race conditions when accessing and updating shared resources.
+     * 2. Parallelize the iteration over all faces (_mesh.n_faces()) using OpenMP.
+     *    - Each thread calculates the face quadric and accumulates it into its
+     *      localQuadrics buffer for the vertices associated with the face.
+     * 3. Use a critical section to safely merge the results from all thread-local
+     *    buffers into the shared _globalQuadrics array after parallel computation.
      */
-    #pragma omp parallel for reduction(+: _globalQuadrics[:_mesh.n_vertices()])
-    for (int i = 0; i < _mesh.n_faces(); ++i)
+    #pragma omp parallel
     {
-        TriMesh::FaceHandle fh = faceHandles[i];
-        if (!fh.is_valid()) continue;
+        std::vector<QMatrix> localQuadrics(_mesh.n_vertices(), QMatrix::Zero());
 
-        QMatrix Kp = QEMSimplifierUtils::computeFaceQuadric(_mesh, fh);
-
-        for (auto fv_it = _mesh.fv_iter(fh); fv_it.is_valid(); ++fv_it)
+        #pragma omp for
+        for (int i = 0; i < _mesh.n_faces(); ++i)
         {
-            size_t vertexIdx = fv_it->idx();
-            _globalQuadrics[vertexIdx] += Kp; // Accumulate locally
+            TriMesh::FaceHandle fh = faceHandles[i];
+            if (!fh.is_valid()) continue;
+
+            QMatrix Kp = QEMSimplifierUtils::computeFaceQuadric(_mesh, fh);
+
+            for (auto fv_it = _mesh.fv_iter(fh); fv_it.is_valid(); ++fv_it)
+            {
+                size_t vertexIdx = fv_it->idx();
+                localQuadrics[vertexIdx] += Kp; // thread-local accumulation
+            }
+        }
+
+        #pragma omp critical
+        for (size_t i = 0; i < _globalQuadrics.size(); ++i)
+        {
+            _globalQuadrics[i] += localQuadrics[i];
         }
     }
 #endif
