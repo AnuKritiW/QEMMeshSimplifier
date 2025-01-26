@@ -1,5 +1,4 @@
 #include "QEMSimplifier.h"
-#include <chrono> // TODO: deleteq
 #include "QEMSimplifierUtils.h"
 
 auto& vQuadric = QEMSimplifierUtils::getQuadricHandle();
@@ -11,10 +10,6 @@ QEMSimplifier::QEMSimplifier()
 
 void QEMSimplifier::computeQuadrics(TriMesh& _mesh)
 {
-    // TODO: delete
-    // Benchmark for parallelization
-    auto start = std::chrono::high_resolution_clock::now(); // Start timer
-
     QEMSimplifierUtils::initializeProperty(_mesh, vQuadric, "v:quadric", QMatrix::Zero().eval());
     QEMSimplifierUtils::initializeProperty(_mesh, vVersion, "v:version", 0);
 
@@ -27,13 +22,6 @@ void QEMSimplifier::computeQuadrics(TriMesh& _mesh)
     {
         _mesh.property(vQuadric, TriMesh::VertexHandle(v_idx)) = globalQuadrics[v_idx];
     }
-
-    // TODO: delete
-    // Benchmark for parallelization
-    auto end = std::chrono::high_resolution_clock::now(); // End timer
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-
-    std::cout << "Time taken for computeQuadrics: " << duration.count() << " ms" << std::endl;
 }
 
 void QEMSimplifier::initializePriorityQueue(TriMesh& _mesh,

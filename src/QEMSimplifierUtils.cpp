@@ -50,7 +50,6 @@ void QEMSimplifierUtils::computeQuadricsInParallel(TriMesh& _mesh, std::vector<Q
 {
 #if defined(QEM_BACKEND_METAL)
     computeQuadricsInParallel_Metal(_mesh, _globalQuadrics);
-    std::cout<<"METAL\n";
 #else
     // Store face handles in a temporary structure for parallelization
     std::vector<TriMesh::FaceHandle> faceHandles;
@@ -81,7 +80,6 @@ void QEMSimplifierUtils::computeQuadricsInParallel(TriMesh& _mesh, std::vector<Q
             _globalQuadrics[vertexIdx] += Kp; // Accumulate locally
         }
     }
-    std::cout<<"CPU\n";
 #endif
 }
 
