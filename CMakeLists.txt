@@ -49,8 +49,6 @@ set(TINYFILEDIALOGS_DIR ${CMAKE_SOURCE_DIR}/dependencies/tinyfiledialogs)
 # Add the executable and its source files
 add_executable(QEMSimplifier)
 
-# find_package(OpenMesh REQUIRED)
-
 # Source files for the main project
 target_sources(QEMSimplifier PRIVATE
     src/main.cpp
@@ -86,6 +84,31 @@ add_library(tinyfiledialogs STATIC
 )
 target_include_directories(tinyfiledialogs PUBLIC ${TINYFILEDIALOGS_DIR})
 target_link_libraries(QEMSimplifier PRIVATE tinyfiledialogs)
+
+###############################################################################
+# OpenMP (Optional)
+###############################################################################
+
+option(USE_OPENMP "Enable OpenMP support for multithreading" OFF)
+
+if (USE_OPENMP)
+    if(APPLE)
+        set(LIBOMP_INCLUDE_DIR "/usr/local/include")
+        set(LIBOMP_LIBRARY "/usr/local/lib/libomp.dylib")
+
+        target_include_directories(QEMSimplifier PRIVATE ${LIBOMP_INCLUDE_DIR})
+        target_link_libraries(QEMSimplifier PRIVATE ${LIBOMP_LIBRARY})
+
+        target_compile_options(QEMSimplifier PRIVATE -Xpreprocessor -fopenmp)
+        target_link_options(QEMSimplifier PRIVATE -L/usr/local/lib -lomp)
+    endif()
+
+    find_package(OpenMP REQUIRED)
+    if(OpenMP_CXX_FOUND)
+        target_compile_options(QEMSimplifier PRIVATE ${OpenMP_CXX_FLAGS})
+        target_link_libraries(QEMSimplifier PRIVATE ${OpenMP_omp_LIBRARY})
+    endif()
+endif()
 
 ###############################################################################
 # Metal GPU Backend (Optional)
