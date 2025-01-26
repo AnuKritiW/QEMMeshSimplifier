@@ -38,12 +38,12 @@ This project implements a mesh simplification algorithm based on Quadric Error M
 ## UML-diagrams
 
 ### Class Diagram
-Source code found [here](./uml/class-diagram.puml)
+Markup source [here](./uml/class-diagram.puml)
 
 ![image](./uml/class-diagram.png)
 
 ### Sequence Diagram:
-Source code found [here](./uml/seq-diagram.puml)
+Markup source [here](./uml/seq-diagram.puml)
 
 ![image](./uml/seq-diagram.png)
 
@@ -55,12 +55,16 @@ Source code found [here](./uml/seq-diagram.puml)
     cd programming-project-AnuKritiW
     ```
 
-2. **Install Dependencies** The project currently requires the following dependencies to be installed manually:
-    * Eigen: For linear algebra computations.
-    * OpenMesh: For mesh processing.
-    * CMake: For build system configuration.
+2. **Dependencies** The project manages dependencies automatically via **CMake**.
 
-    Ensure these libraries are installed on your system before building the project.
+    Ensure **CMake** is installed on your system, and the build process will fetch and configure the following libraries:
+
+    * **Eigen**: For linear algebra computations.
+    * **OpenMesh**: For mesh processing.
+    * **Polyscope**: For the graphical user interface (GUI).
+    * **tinyfiledialogs**: For file dialog and explorer capabilities.
+    * **GoogleTest (GTest)**: For unit testing.
+    * **Metal** (macOS only): Used for GPU-accelerated computations when the {USE_METAL} option is enabled. This feature requires macOS and the Metal framework.
 
 3. **Build the Project** Run the following commands to configure and build the project:
     ```
@@ -119,15 +123,11 @@ The project includes multiple test executables to validate its functionality:
 Here are some results of mesh simplification using this program:
 
 
-| Simplification Level | Screenshot                                           |
-| -------------------- | ---------------------------------------------------- |
-| Original             | ![image](./References/screenshots/screenshot_00.png) |
-| 25%                  | ![image](./References/screenshots/screenshot_25.png) |
-| 50%                  | ![image](./References/screenshots/screenshot_50.png) |
-| 75%                  | ![image](./References/screenshots/screenshot_75.png) |
-| 90%                  | ![image](./References/screenshots/screenshot_90.png) |
-
-## TODOs
-
-* Have CMakeLists fetch dependencies
-* Add button in polyscope viewer to simplify to n faces in real time.
+| Simplification Level | Vertices | Edges | Faces | Screenshot                                           |
+| -------------------- | -------- | ----- | ----- | ---------------------------------------------------- |
+| Original             | 326      | 972   | 648   | ![image](./References/screenshots/screenshot_00.png) |
+| 10%                  | 293      | 873   | 582   | ![image](./References/screenshots/screenshot_10.png) |
+| 25%                  | 245      | 729   | 486   | ![image](./References/screenshots/screenshot_25.png) |
+| 50%                  | 164      | 486   | 324   | ![image](./References/screenshots/screenshot_50.png) |
+| 75%                  | 83       | 243   | 162   | ![image](./References/screenshots/screenshot_75.png) |
+| 90%                  | 34       | 96    | 64    | ![image](./References/screenshots/screenshot_90.png) |
