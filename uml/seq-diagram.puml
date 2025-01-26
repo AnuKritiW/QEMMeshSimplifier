@@ -1,0 +1,54 @@
+@startuml
+actor Developer
+
+participant Main as "main"
+participant Parser as "parser" <<Class>>
+participant QEMSimplifier as "QEMSimplifier" <<Class>>
+participant Utils as "QEMSimplifierUtils" <<Class>>
+participant GPU as "QEMSimplifierUtils_metal" <<Metal>>
+participant OpenMesh as "OpenMesh" <<Library>>
+participant Polyscope as "Polyscope" <<Library>>
+
+Developer -> Main: Executes main()
+Main -> Parser: loadMesh(filename, mesh)
+Parser -> OpenMesh: read_mesh()
+Parser <-- OpenMesh: Success/Failure
+Main <-- Parser: mesh loaded
+Main -> Parser: extractMeshData(mesh, vertices_matrix, faces_matrix)
+Main <-- Parser: vertices_matrix extracted, faces_matrix extracted
+Main -> Polyscope: registerSurfaceMesh(vertices_matrix, faces_matrix)
+loop User Interaction
+    Main -> Polyscope: userCallback()
+    ' Main -> Main: openFileExplorer(mesh, filename)
+    Main -> QEMSimplifier: simplifyMesh(mesh, targetFaces)
+    ' QEMSimplifier -> QEMSimplifier: computeQuadrics(mesh)
+    QEMSimplifier -> Utils: computeQuadricsInParallel(mesh, globalQuadrics)
+    alt Metal Backend
+        Utils -> GPU: computeQuadricsInParallel(mesh, globalQuadrics)
+        GPU --> Utils: Quadrics Computed
+    else CPU Backend
+        par
+            Utils -> Utils: computeFaceQuadric(mesh, face)
+        end
+    end
+    Utils --> QEMSimplifier: globalQuadrics Computed
+    QEMSimplifier -> QEMSimplifier: initializePriorityQueue(mesh, priQ)
+    par
+        QEMSimplifier -> Utils: computeEdgeCollapseCost(mesh, edge)
+        QEMSimplifier -> Utils: mergeVertexProperties(mesh, vFrom, vTo)
+    end
+    loop Simplification
+        QEMSimplifier -> OpenMesh: collapse(edge)
+        QEMSimplifier -> QEMSimplifier: recalculateEdgeCosts(mesh, vKeep)
+        par
+            QEMSimplifier -> Utils: computeEdgeCollapseCost(mesh, edge, optPos)
+            QEMSimplifier -> Utils: mergeVertexProperties(mesh, vFrom, vTo)
+        end
+    end
+    QEMSimplifier -> OpenMesh: garbage_collection()
+    QEMSimplifier <-- OpenMesh: mesh cleaned
+    Main <-- QEMSimplifier: mesh simplified
+    Main -> Polyscope: rebuildPolyscopeMesh(mesh)
+end
+Developer <- Main: Mesh Simplified
+@enduml

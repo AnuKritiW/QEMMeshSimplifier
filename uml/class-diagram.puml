@@ -1,0 +1,92 @@
+@startuml
+class Main {
+    + main() : int
+    + rebuildPolyscopeMesh(_mesh: TriMesh&) : void
+    + openFileExplorer(_mesh: TriMesh&, _isFileDialogOpen: bool&, _filename: std::string&) : void
+    + simplifyMeshByPercentage(_mesh: TriMesh&, _meshHistory: stack<TriMesh>&, _simplifyPercentage: float) : void
+    + undoLastSimplification(_mesh: TriMesh&, _meshHistory: stack<TriMesh>&) : void
+    + resetMesh(_mesh: TriMesh&, _meshHistory: stack<TriMesh>&, _filename: std::string&) : void
+    + displayMeshStatistics(_mesh: TriMesh&) : void
+}
+
+class Parser {
+    + {static} loadMesh(_filename: std::string, _mesh: TriMesh&) : bool
+    + {static} extractMeshData(_mesh: TriMesh&, vertices_matrix: Eigen::MatrixXd&, faces_matrix: Eigen::MatrixXi&) : void
+}
+
+class QEMSimplifier {
+    + QEMSimplifier()
+    + simplifyMesh(_mesh: TriMesh&, _tgtNumFaces: size_t) : void
+    - computeQuadrics(_mesh: TriMesh&) : void
+    - initializePriorityQueue(_mesh: TriMesh&, _priQ: priority_queue<EdgeInfo>) : void
+    - collapseEdge(_mesh: TriMesh&, _edge: EdgeHandle, _newPos: Vector3d, _vKeep: VertexHandle&) : bool
+    - recalculateEdgeCosts(_mesh: TriMesh&, _vKeep: VertexHandle, _priQ: priority_queue<EdgeInfo>) : void
+    - {static} vQuadric : OpenMesh::VPropHandleT<Eigen::Matrix4d>
+    - {static} vVersion : OpenMesh::VPropHandleT<int>
+}
+
+class QEMSimplifierUtils {
+    + {static} computePlaneEquation(_p0: Point, _p1: Point, _p2: Point) : Vector4d
+    + {static} computeFaceQuadric(_mesh: TriMesh&, _face: FaceHandle) : QMatrix
+    + {static} computeQuadricsInParallel(_mesh: TriMesh&, _globalQuadrics: vector<QMatrix>&) : void
+    + {static} computeEdgeCollapseCost(_mesh: TriMesh&, _edge: EdgeHandle, _optPos: Vector3d&) : float
+    + {static} getQuadricHandle() : VPropHandleT<Eigen::Matrix4d>&
+    + {static} getVersionHandle() : VPropHandleT<int>&
+    + {static} getVertexQuadric(_mesh: TriMesh&, _vh: VertexHandle&) : QMatrix&
+    + {static} initializeProperty(TriMesh& _mesh, OpenMesh::VPropHandleT<T>& property, const std::string& name, const T& defaultValue) : void
+    + {static} mergeVertexProperties(_mesh: TriMesh&, _vFrom: VertexHandle, _vTo: VertexHandle) : void
+    - {static} vQuadric : OpenMesh::VPropHandleT<Eigen::Matrix4d>
+    - {static} vVersion : OpenMesh::VPropHandleT<int>
+}
+
+struct EdgeInfo {
+    + bool operator>(const EdgeInfo& rhs) const
+    - TriMesh::EdgeHandle edgeHandle
+    - float cost
+    - Eigen::Vector3d optPos
+    - int versionSum
+}
+
+struct Face_utils <<Metal>> {
+    + v0: uint16_t
+    + v1: uint16_t
+    + v2: uint16_t
+}
+
+struct Face_kernel <<Metal>> {
+    + v0: ushort;
+    + v1: ushort;
+    + v2: ushort;
+}
+
+stereotype QEMSimplifierUtils_metal <<Metal>> {
+    - gDevice: id<MTLDevice>
+    - gCommandQueue: id<MTLCommandQueue>
+    - gLibrary: id<MTLLibrary>
+    + computeQuadricsInParallel_Metal(TriMesh& _mesh, std::vector<QMatrix>& _globalQuadrics)
+    + initializeMetal()
+}
+
+stereotype QEMSimplifierUtilsKernel <<Metal>> {
+    - computeFaceQuadricKernel(const device Face* faces, const device float3* vertexPos, device float4x4* faceQuadrics, constant uint& numFaces, device float4x4* debugLogBuffer, uint gid)
+    - accumulateQuadricsKernel(const device Face* faces, const device float4x4* faceQuadrics, device atomic_float4x4* vertexQuadrics, constant uint& numFaces, uint gid)
+}
+
+' Indicate typedefs and relationships
+Main --> Parser : uses
+Main --> QEMSimplifier : uses
+QEMSimplifier --> QEMSimplifierUtils : uses
+QEMSimplifier *-- EdgeInfo : composition
+QEMSimplifierUtils --> QEMSimplifierUtils_metal : uses
+QEMSimplifierUtils_metal --> QEMSimplifierUtilsKernel : uses
+QEMSimplifierUtils_metal *-- Face_utils : composition
+QEMSimplifierUtilsKernel *-- Face_kernel : composition
+
+note as GeneralNote
+The following typedefs are shared across the project:
+- TriMesh: OpenMesh::TriMesh_ArrayKernelT<>
+- QMatrix: Eigen::Matrix4d
+These typedefs are declared in QEMSimplifier.h, QEMSimplifierUtils.h, and Parser.h.
+end note
+
+@enduml
