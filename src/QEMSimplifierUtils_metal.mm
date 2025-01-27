@@ -59,7 +59,6 @@ void initializeMetal()
         return;
     }
 
-    // TODO: consider should this be moved down?
     // Build pipelines
     id<MTLFunction> f1  = [gLibrary newFunctionWithName:@"computeFaceQuadricKernel"];
     faceQuadricPipeline = [gDevice newComputePipelineStateWithFunction:f1 error:&err];

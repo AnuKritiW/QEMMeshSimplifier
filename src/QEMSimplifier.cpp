@@ -226,7 +226,6 @@ void QEMSimplifier::simplifyMesh(TriMesh& _mesh, size_t _tgtNumFaces)
     std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>> priQ;
     initializePriorityQueue(_mesh, priQ);
 
-    // TODO: add test for negative faces for numFaces and tgtNumFaces
     unsigned int numFaces = _mesh.n_faces();
     while (numFaces > _tgtNumFaces && !priQ.empty())
     {
