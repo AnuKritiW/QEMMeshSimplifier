@@ -4,7 +4,9 @@
 
 \[Paper found [here](./References/Surface%20Simplification%20Using%20Quadric%20Error%20Metrics.pdf)\]
 
-This project implements a mesh simplification algorithm based on Quadric Error Metrics (QEM). It allows high-quality approximations of polygonal models through iterative vertex pair contractions. The program is designed for efficiency, with an emphasis on maintaining surface error approximations using quadric matrices.
+\[Demo with narration [here](https://youtu.be/AmDRhxQTcSE)\]
+
+This project implements a mesh simplification algorithm based on Quadric Error Metrics (QEM) (Garland & Heckbert, 1997). It allows high-quality approximations of polygonal models through iterative vertex pair contractions. The program is designed for efficiency, with an emphasis on maintaining surface error approximations using quadric matrices.
 
 > ## Table of Contents:
 > - [Overview](#overview)
@@ -21,7 +23,7 @@ This project implements a mesh simplification algorithm based on Quadric Error M
 > - [References](#references)
 
 ## Overview
-* Simplifies polygonal models using Quadric Error Metrics (QEM).
+* Simplification of polygonal models using Quadric Error Metrics (QEM).
 * Iterative contractions of vertex pairs to reduce model complexity.
 * Efficient handling of surface error approximations with quadric matrices.
 
@@ -32,7 +34,7 @@ This project implements a mesh simplification algorithm based on Quadric Error M
 
 * Algorithm:
     1. Compute the **Q** matrices for all initial vertices
-        - **Q** matrices are a 4x4 error matrix that is computed using a  heuristic given by Ronfard and Rossignac
+        - **Q** matrices are a 4x4 error matrix that is computed using a  heuristic given by Ronfard and Rossignac (1993)
     2. Select all valid pairs
     3. Compute the optimal contraction target <strong><span style="text-decoration:overline;">v</span></strong> for each valid pair <strong>(v<sub>1</sub>, v<sub>2</sub>)</strong>. The error <strong>
   <span style="text-decoration:overline;">v</span><sup>T</sup> (Q<sub>1</sub> + Q<sub>2</sub>) <span style="text-decoration:overline;">v</span></strong> of this target vertex becomes the _cost_ of contracting that pair.
@@ -60,7 +62,7 @@ Markup source [here](./uml/seq-diagram.puml)
     cd programming-project-AnuKritiW
     ```
 
-2. **Dependencies** The project manages dependencies automatically via **CMake**.
+2. **Dependencies**: The project manages dependencies automatically via **CMake**.
 
     Ensure **CMake** is installed on your system, and the build process will fetch and configure the following libraries:
 
@@ -97,7 +99,7 @@ Markup source [here](./uml/seq-diagram.puml)
         * **Windows**: OpenMP is included in most recent versions of MSVC.
     * **Metal** (macOS only): Used for GPU-accelerated computations when the `{USE_METAL}` option is enabled. This feature requires macOS and the Metal framework.
 
-3. **Build the Project** Run the following commands to configure and build the project:
+3. **Build the Project**: Run the following commands to configure and build the project:
     ```bash
     mkdir build && cd build
     cmake ..
@@ -190,7 +192,7 @@ Here are some results of mesh simplification using this program:
 
 * **Standard Template Library (STL)**: STL containers like `std::vector` and `std::priority_queue` manage mesh data and edge collapse costs efficiently.
 
-* **RAII (Resource Acquisition Is Initialization):**:
+* **RAII (Resource Acquisition Is Initialization)**:
     * In `computeQuadricsInParallel_Metal` (in `QEMSimplifierUtils_metal.mm`), instead of using raw arrays for managing face and vertex data, `std::vector` was used to safely allocate and manage memory as it automatically handles memory allocation/deallocation.
         ```cpp
         std::vector<Face> facesVec(numFaces);
@@ -210,6 +212,7 @@ Here are some results of mesh simplification using this program:
 Feature branches and bug-fix branches were used consistently to ensure the `main` branch remained stable and production-ready.
 * **Feature Branches**: Each feature/functionality, such as multithreading (OpenMP) or GPU acceleration (Metal), was developed on a separate branch to isolate changes.
 * **Pull Requests (PRs)**: All changes were merged into the main branch through well-documented PRs. Each PR included a detailed description of the changes, making it easy to trace the purpose of merge commits.
+    * PR history can be found [here](https://github.com/NCCA/programming-project-AnuKritiW/pulls?q=is%3Apr+is%3Aclosed)
 * **Commit History**: The commit history consists of small, meaningful commits that clearly document the development process. Since this is an assignment submission, features and bug fixes were not squashed before merging to preserve a transparent record of interactions with the repository.
 
 ## Multithreading Using OpenMP
@@ -250,6 +253,8 @@ The last successful build before the cap was hit can be found [here](https://git
 
 The workflow file can be found in: `.github/workflows/actions.yml`
 
+I also experimented with integrating Docker to create a consistent build environment across platforms. While Docker was not used in the final project, the experimental implementation can be found on the `github-actions-docker` branch [here](https://github.com/NCCA/programming-project-AnuKritiW/tree/github-actions-docker).
+
 ## References
 
 Apple Developer, no date. Performing Calculations on a GPU. Apple. Available from: https://developer.apple.com/documentation/metal/performing-calculations-on-a-gpu [Accessed 4 January 2025].
@@ -260,9 +265,11 @@ of the 24th annual conference on Computer graphics and interactive techniques. 2
 Mousa, M.H. and Hussein, M.K., 2021. High-performance simplification of triangular surfaces using
 a GPU. PloS one, 16(8), p.e0255832. Available from: https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0255832 [Accessed 24 December 2024].
 
+Rossignac, J. and Borrel, P., 1993. Multi-resolution 3D approximations for rendering complex scenes.
+Modeling in computer graphics: methods and applications, 455-465. Available from: https://link.springer.com/chapter/10.1007/978-3-642-78114-8_29 [Accessed 28 October 2024].
+
 ChatGPT was used for debugging and documentation.
-* When debugging, I sent my code snippets and the error message as a prompt.
-* Documentation was similar in that I would send my writeups to ask for better, more concise phrasing -- for both this README and for comments within the code.
-* Sometimes used for good concise commit messages based on my changes and PR descriptions based on my commit message history.
-* As Objective-C and Metal were new to me, ChatGPT was used for support with syntax and retrieving the right data types. The algorithm is the same as the CPU implementation.
+* When debugging, I sent my code snippets and the corresponding error message as a prompt.
+* For documentation, I sometimes used ChatGPT for better, more concise phrasing -- for the README, comments within the code, commit messages and PR descriptions. It was also used to generate Doxygen-styled comments above each function.
+* As Objective-C and Metal were new to me, ChatGPT was used for support with syntax. The GPU implementation retains the same algorithm as my original CPU version.
 * All suggestions provided by ChatGPT were critically reviewed and adapted as necessary to ensure correctness and alignment with the project requirements.
