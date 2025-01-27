@@ -13,6 +13,12 @@ This project implements a mesh simplification algorithm based on Quadric Error M
 > - [Testing instructions](#testing-instructions)
 > - [UI](#ui)
 > - [Demo](#demo)
+> - [Use of Modern C++](#use-of-modern-c)
+> - [Branching and PRs](#branching-and-PRs)
+> - [Multithreading using OpenMP](#multithreading-using-openmp)
+> - [Performing calculations on a GPU using Metal](#performing-calculations-on-a-gpu-using-metal)
+> - [Continuous Integration using Github Actions](#continuous-integration-using-github-actions)
+> - [References](#references)
 
 ## Overview
 * Simplifies polygonal models using Quadric Error Metrics (QEM).
@@ -167,3 +173,94 @@ Here are some results of mesh simplification using this program:
 | 50%                  | 164      | 486   | 324   | ![image](./References/screenshots/screenshot_50.png) |
 | 75%                  | 83       | 243   | 162   | ![image](./References/screenshots/screenshot_75.png) |
 | 90%                  | 34       | 96    | 64    | ![image](./References/screenshots/screenshot_90.png) |
+
+# Use of Modern C++
+
+* **Templates**: Used in `QEMSimplifierUtils.h` for initializing and merging mesh properties, ensuring reusability and type safety across various property types​​.
+
+    ```cpp
+    template <typename T>
+    static void initializeProperty(TriMesh& _mesh, OpenMesh::VPropHandleT<T>& property, const std::string& name, const T& defaultValue) { ... };
+    ```
+
+* **Lambdas**: Simplifed code logic within UI callbacks for the Polyscope viewer integration in `main.cpp`​.
+    ```cpp
+    polyscope::state::userCallback = [&mesh, &filename]() { ... }
+    ```
+
+* **Standard Template Library (STL)**: STL containers like `std::vector` and `std::priority_queue` manage mesh data and edge collapse costs efficiently.
+
+* **RAII (Resource Acquisition Is Initialization):**:
+    * In `computeQuadricsInParallel_Metal` (in `QEMSimplifierUtils_metal.mm`), instead of using raw arrays for managing face and vertex data, `std::vector` was used to safely allocate and manage memory as it automatically handles memory allocation/deallocation.
+        ```cpp
+        std::vector<Face> facesVec(numFaces);
+        std::vector<simd::float3> vertPos(numVerts);
+        std::vector<bool> visitedVerts(numVerts, false);
+        ```
+    * Use of `id<MTLBuffer>` (in `QEMSimplifierUtils_metal.mm`) objects to handle GPU memory, avoiding manual memory management. `newBufferWithBytes` method encapsulates the memory allocation and ensures proper cleanup, allowing the Metal framework to manage the lifecycle of GPU buffers.
+        ```cpp
+        id<MTLBuffer> facesBuf = [gDevice newBufferWithBytes:facesVec.data()
+                                  length:facesVec.size() * sizeof(Face)
+                                  options:MTLResourceStorageModeShared];
+        ```
+    * Eigen Matrices: Eigen’s matrix objects are used extensively across the project for safe, scope-bound memory handling during mathematical computations​​.
+
+## Branching and PRs
+
+Feature branches and bug-fix branches were used consistently to ensure the `main` branch remained stable and production-ready.
+* **Feature Branches**: Each feature/functionality, such as multithreading (OpenMP) or GPU acceleration (Metal), was developed on a separate branch to isolate changes.
+* **Pull Requests (PRs)**: All changes were merged into the main branch through well-documented PRs. Each PR included a detailed description of the changes, making it easy to trace the purpose of merge commits.
+* **Commit History**: The commit history consists of small, meaningful commits that clearly document the development process. Since this is an assignment submission, features and bug fixes were not squashed before merging to preserve a transparent record of interactions with the repository.
+
+## Multithreading Using OpenMP
+
+OpenMP was integrated to parallelize compute-intensive operations:
+
+* **Quadrics Calculation**: Each face’s quadric matrix is computed in parallel.
+* **Edge Recalculation**: Edge collapse costs are recalculated in parallel
+
+e.g.
+```cpp
+#pragma omp parallel for
+// for every edge, compute the cost and the new pos
+for (size_t idx = 0; idx < _mesh.n_edges(); ++idx) { ... }
+```
+
+Further improvements can be done by adding validation checks.
+
+## Performing Calculations on a GPU Using Metal
+
+GPU acceleration using Metal was implemented for face and vertex quadric calculations:
+
+* **Pipeline Setup**: Metal compute pipelines were initialized for face quadrics and accumulation into vertex quadrics​.
+* **Data Transfer**: Mesh data, such as vertex positions and face indices, are transferred to GPU buffers for processing.
+* **Compute Kernels**: Metal shaders (`computeFaceQuadricKernel` and `accumulateQuadricsKernel`) handle parallel computation on the GPU.
+
+## Continuous Integration Using GitHub Actions
+
+The project employs GitHub Actions for continuous integration:
+
+* **Automated Testing**: A suite of unit tests (`ParserTests`, `QEMSimplifierTests`, etc.) is automatically executed on each push or pull request​.
+* **Build Verification**: CI workflows validate builds across multiple configurations (e.g., Metal-enabled builds).
+* **Parallelized Test Runs**: ctest runs are parallelized using the -j flag to speed up testing.
+
+NOTE: As the organisation's limit of 2000 hours was hit in January, I was unable to verify that Github Actions are still running smoothly. Also, I did not add validation for the OpenMP build as this was fixed after the cap was hit.
+
+The last successful build before the cap was hit can be found [here](https://github.com/NCCA/programming-project-AnuKritiW/actions/runs/12911878185/workflow).
+
+The workflow file can be found in: `.github/workflows/actions.yml`
+
+# References
+
+Apple Developer, no date. Performing Calculations on a GPU. Apple. Available from: https://developer.apple.com/documentation/metal/performing-calculations-on-a-gpu [Accessed 4 January 2025].
+
+Garland, M. and Heckbert, P.S., 1997. Surface simplification using quadric error metrics. Proceedings
+of the 24th annual conference on Computer graphics and interactive techniques. 209-216. Available from: https://dl.acm.org/doi/abs/10.1145/258734.258849 [Accessed 28 October 2024].
+
+Mousa, M.H. and Hussein, M.K., 2021. High-performance simplification of triangular surfaces using
+a GPU. PloS one, 16(8), p.e0255832. Available from: https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0255832 [Accessed 24 December 2024].
+
+ChatGPT was used for debugging and documentation.
+* When debugging, I sent my code snippets and the error message as a prompt.
+* Documentation was similar in that I would send my writeups to ask for better, more concise phrasing -- for both this README and for comments within the code.
+* Sometimes used for good concise commit messages based on my changes and PR descriptions based on my commit message history.
