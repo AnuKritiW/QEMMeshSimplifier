@@ -11,7 +11,7 @@ This project implements a mesh simplification algorithm based on Quadric Error M
 > - [UML Diagrams](#uml-diagrams)
 > - [Build Instructions](#build-instructions)
 > - [Testing instructions](#testing-instructions)
-> - [UI](#ui)
+> - [GUI](#gui)
 > - [Demo](#demo)
 > - [Use of Modern C++](#use-of-modern-c)
 > - [Branching and PRs](#branching-and-PRs)
@@ -150,7 +150,7 @@ The project includes multiple test executables to validate its functionality:
     ```
     This approach runs only the specified test executables in parallel, speeding up the testing process.
 
-## UI
+## GUI
 
 ![image](./References/screenshots/ui.png)
 
@@ -174,7 +174,7 @@ Here are some results of mesh simplification using this program:
 | 75%                  | 83       | 243   | 162   | ![image](./References/screenshots/screenshot_75.png) |
 | 90%                  | 34       | 96    | 64    | ![image](./References/screenshots/screenshot_90.png) |
 
-# Use of Modern C++
+## Use of Modern C++
 
 * **Templates**: Used in `QEMSimplifierUtils.h` for initializing and merging mesh properties, ensuring reusability and type safety across various property types​​.
 
@@ -250,7 +250,7 @@ The last successful build before the cap was hit can be found [here](https://git
 
 The workflow file can be found in: `.github/workflows/actions.yml`
 
-# References
+## References
 
 Apple Developer, no date. Performing Calculations on a GPU. Apple. Available from: https://developer.apple.com/documentation/metal/performing-calculations-on-a-gpu [Accessed 4 January 2025].
 
@@ -264,3 +264,5 @@ ChatGPT was used for debugging and documentation.
 * When debugging, I sent my code snippets and the error message as a prompt.
 * Documentation was similar in that I would send my writeups to ask for better, more concise phrasing -- for both this README and for comments within the code.
 * Sometimes used for good concise commit messages based on my changes and PR descriptions based on my commit message history.
+* As Objective-C and Metal were new to me, ChatGPT was used for support with syntax and retrieving the right data types. The algorithm is the same as the CPU implementation.
+* All suggestions provided by ChatGPT were critically reviewed and adapted as necessary to ensure correctness and alignment with the project requirements.
