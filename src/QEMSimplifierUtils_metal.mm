@@ -23,6 +23,18 @@ static id<MTLLibrary>              gLibrary            = nil;                   
 static id<MTLComputePipelineState> faceQuadricPipeline = nil;                            // defines how metal executes the computeFaceQuadricKernel
 static id<MTLComputePipelineState> accumulatePipeline  = nil;                            // defines how metal executes the accumulateQuadricsKernel (vertices)
 
+/**
+ * @brief Initializes the Metal compute pipeline for GPU-based quadric computations.
+ *
+ * This function loads the Metal library specified by the `CMAKE_METALLIB_PATH`,
+ * checks for its existence, and initializes the compute pipelines for face quadric
+ * and vertex accumulation kernels. If initialization fails, it logs an error.
+ *
+ * @note This function is idempotent and only initializes the library once.
+ *
+ * @see Apple Developer Documentation: Performing Calculations on a GPU
+ *      https://developer.apple.com/documentation/metal/performing_calculations_on_a_gpu
+ */
 void initializeMetal()
 {
     // Only initialize gLibrary once
@@ -62,11 +74,25 @@ void initializeMetal()
     }
 }
 
-/*
-1. Send _mesh data to the GPU.
-2. Execute the computeFaceQuadricKernel on the GPU.
-3. Retrieve results and populate _globalQuadrics.
-*/
+/**
+ * @brief Computes vertex quadric matrices for a mesh using GPU acceleration with Metal.
+ *
+ * @param _mesh The input mesh whose quadric matrices are to be computed.
+ * @param _globalQuadrics A vector to store the computed quadric matrices for all vertices.
+ *
+ * This function performs the following steps:
+ * 1. Converts the mesh's faces and vertices into GPU-compatible data formats.
+ * 2. Sends the face and vertex data to GPU buffers.
+ * 3. Executes the `computeFaceQuadricKernel` on the GPU to calculate face quadrics.
+ * 4. Executes the `accumulateQuadricsKernel` on the GPU to accumulate face quadrics into vertex quadrics.
+ * 5. Retrieves the results from the GPU and populates the `_globalQuadrics` vector.
+ *
+ * @note This function requires the Metal compute pipelines to be initialized
+ *       through the `initializeMetal` function.
+ *
+ * @see Apple Developer Documentation: Performing Calculations on a GPU
+ *      https://developer.apple.com/documentation/metal/performing_calculations_on_a_gpu
+ */
 extern "C" void computeQuadricsInParallel_Metal(TriMesh& _mesh, std::vector<QMatrix>& _globalQuadrics)
 {
     // validate

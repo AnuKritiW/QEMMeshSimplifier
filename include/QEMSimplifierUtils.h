@@ -18,22 +18,22 @@ class QEMSimplifierUtils
 public:
     // Template utility for property initialization
     template <typename T>
-    static void initializeProperty(TriMesh& _mesh, OpenMesh::VPropHandleT<T>& property, const std::string& name, const T& defaultValue)
+    static void initializeProperty(TriMesh& _mesh, OpenMesh::VPropHandleT<T>& _property, const std::string& _name, const T& _defaultValue)
     {
-        if (!_mesh.get_property_handle(property, name))
+        if (!_mesh.get_property_handle(_property, _name))
         {
-            _mesh.add_property(property, name);
+            _mesh.add_property(_property, _name);
             for (auto v_it = _mesh.vertices_begin(); v_it != _mesh.vertices_end(); ++v_it)
             {
-                _mesh.property(property, *v_it) = defaultValue;
+                _mesh.property(_property, *v_it) = _defaultValue;
             }
         }
     };
 
     template <typename T>
-    static T mergeVertexProperties(const TriMesh& _mesh, TriMesh::VertexHandle v0, TriMesh::VertexHandle v1, OpenMesh::VPropHandleT<T>& property)
+    static T mergeVertexProperties(const TriMesh& _mesh, TriMesh::VertexHandle _v0, TriMesh::VertexHandle _v1, OpenMesh::VPropHandleT<T>& _property)
     {
-        return _mesh.property(property, v0) + _mesh.property(property, v1);
+        return _mesh.property(_property, _v0) + _mesh.property(_property, _v1);
     }
 
     // Compute Functions

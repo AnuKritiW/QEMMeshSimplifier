@@ -7,6 +7,18 @@ OpenMesh::VPropHandleT<int> QEMSimplifierUtils::vVersion;
 extern void computeQuadricsInParallel_Metal(TriMesh& mesh, std::vector<QMatrix>& globalQuadrics);
 #endif
 
+/**
+ * @brief Computes the plane equation for a triangle defined by three points.
+ *
+ * @param _p0 The first point of the triangle.
+ * @param _p1 The second point of the triangle.
+ * @param _p2 The third point of the triangle.
+ * @return A 4D vector representing the plane equation coefficients [a, b, c, d],
+ *         where the plane equation is ax + by + cz + d = 0.
+ *
+ * This function calculates the plane normal as the cross product of two edge
+ * vectors and normalizes it. The plane's offset (d) is computed using one of the points.
+ */
 Eigen::Vector4d QEMSimplifierUtils::computePlaneEquation(const TriMesh::Point& _p0,
                                                          const TriMesh::Point& _p1,
                                                          const TriMesh::Point& _p2)
@@ -21,6 +33,16 @@ Eigen::Vector4d QEMSimplifierUtils::computePlaneEquation(const TriMesh::Point& _
     return Eigen::Vector4d(a, b, c, d);
 }
 
+/**
+ * @brief Computes the quadric matrix for a given face in the mesh.
+ *
+ * @param _mesh The mesh containing the face.
+ * @param _face The handle of the face for which the quadric matrix is computed.
+ * @return A 4x4 matrix (QMatrix) representing the quadric matrix of the face.
+ *
+ * The function calculates the plane equation of the face using its vertices
+ * and computes the quadric as the outer product of the plane equation coefficients.
+ */
 QMatrix QEMSimplifierUtils::computeFaceQuadric(TriMesh& _mesh, TriMesh::FaceHandle _face)
 {
     std::vector<TriMesh::VertexHandle> faceVerts;
@@ -46,6 +68,17 @@ QMatrix QEMSimplifierUtils::computeFaceQuadric(TriMesh& _mesh, TriMesh::FaceHand
     return (plane * plane.transpose());
 }
 
+/**
+ * @brief Computes the vertex quadric matrices for all vertices in the mesh in parallel.
+ *
+ * @param _mesh The input mesh whose vertex quadrics are computed.
+ * @param _globalQuadrics A vector to store the computed quadric matrices for all vertices.
+ *
+ * This function supports both CPU-based and GPU-based parallel computation,
+ * depending on the backend (e.g., OpenMP or Metal). For the CPU implementation,
+ * thread-local buffers are used to compute and accumulate face quadrics into
+ * vertex quadrics safely.
+ */
 void QEMSimplifierUtils::computeQuadricsInParallel(TriMesh& _mesh, std::vector<QMatrix>& _globalQuadrics)
 {
 #if defined(QEM_BACKEND_METAL)
@@ -100,6 +133,18 @@ void QEMSimplifierUtils::computeQuadricsInParallel(TriMesh& _mesh, std::vector<Q
 #endif
 }
 
+/**
+ * @brief Computes the cost of collapsing an edge and the optimal new vertex position.
+ *
+ * @param _mesh The mesh containing the edge.
+ * @param _edge The handle of the edge to be evaluated.
+ * @param _optPos The output parameter to store the optimal position for the new vertex.
+ * @return The cost of collapsing the edge.
+ *
+ * This function calculates the quadric sum of the edge's vertices and determines
+ * the position that minimizes the error metric. If the quadric matrix is not
+ * invertible, the midpoint of the edge is used as a fallback.
+ */
 float QEMSimplifierUtils::computeEdgeCollapseCost(TriMesh& _mesh, TriMesh::EdgeHandle _edge, Eigen::Vector3d& _optPos)
 {
     // Get vert handles
@@ -162,16 +207,42 @@ float QEMSimplifierUtils::computeEdgeCollapseCost(TriMesh& _mesh, TriMesh::EdgeH
     return cost;    // collapse cost
 }
 
+/**
+ * @brief Retrieves the quadric property handle for the vertices in the mesh.
+ *
+ * @return A reference to the quadric property handle.
+ *
+ * This function provides access to the static vertex property handle
+ * used to store quadric matrices for vertices.
+ */
 OpenMesh::VPropHandleT<Eigen::Matrix4d>& QEMSimplifierUtils::getQuadricHandle()
 {
     return vQuadric;
 }
 
+/**
+ * @brief Retrieves the version property handle for the vertices in the mesh.
+ *
+ * @return A reference to the version property handle.
+ *
+ * This function provides access to the static vertex property handle
+ * used to store version numbers for vertices, aiding in edge collapse tracking.
+ */
 OpenMesh::VPropHandleT<int>& QEMSimplifierUtils::getVersionHandle()
 {
     return vVersion;
 }
 
+/**
+ * @brief Retrieves the quadric matrix for a specific vertex in the mesh.
+ *
+ * @param _mesh The mesh containing the vertex.
+ * @param _vh The handle of the vertex whose quadric matrix is retrieved.
+ * @return A reference to the quadric matrix of the specified vertex.
+ *
+ * This function provides direct access to the quadric matrix stored in the
+ * vertex property, allowing for modifications or queries.
+ */
 QMatrix& QEMSimplifierUtils::getVertexQuadric(TriMesh& _mesh, const TriMesh::VertexHandle& _vh)
 {
     return _mesh.property(vQuadric, _vh);

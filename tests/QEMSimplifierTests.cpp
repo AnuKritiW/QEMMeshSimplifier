@@ -263,8 +263,6 @@ TEST_F(CollapseEdgeTest, collapseEdge)
     TriMesh::HalfedgeHandle he0 = mesh.halfedge_handle(edge, 0);
     ASSERT_TRUE(mesh.is_collapse_ok(he0));
 
-    // TriMesh::VertexHandle vKeep = mesh.to_vertex_handle(he0); // By convention, keep "to_vertex"
-
     // Compute the new position for vKeep (midpoint of v1 and v2)
     Eigen::Vector3d newPos;
     TriMesh::Point p1 = mesh.point(v1);
@@ -308,8 +306,8 @@ TEST_F(CollapseEdgeTest, collapseEdgeNotAllowed)
     }
 
     // Find the edge between v0 and v1
-    auto v0 = mesh.vertex_handle(0); // First vertex
-    auto v1 = mesh.vertex_handle(1); // Second vertex
+    auto v0 = mesh.vertex_handle(0);
+    auto v1 = mesh.vertex_handle(1);
     ASSERT_TRUE(v0.is_valid());
     ASSERT_TRUE(v1.is_valid());
 
@@ -433,8 +431,8 @@ TEST_F(InitializePriorityQueueTest, initializePriorityQueueDeletedEdges)
 {
     const int numEdges = mesh.n_edges();
     // Find the edge between v0 and v1
-    auto v0 = mesh.vertex_handle(0); // First vertex
-    auto v1 = mesh.vertex_handle(1); // Second vertex
+    auto v0 = mesh.vertex_handle(0);
+    auto v1 = mesh.vertex_handle(1);
     ASSERT_TRUE(v0.is_valid());
     ASSERT_TRUE(v1.is_valid());
 

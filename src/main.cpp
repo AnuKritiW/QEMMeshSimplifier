@@ -11,7 +11,14 @@
 #include "QEMSimplifier.h"
 #include "tinyfiledialogs.h"
 
-// Helper to re-extract the geometry from mesh and update Polyscope
+/**
+ * @brief Rebuilds the Polyscope mesh display with the current state of the mesh.
+ *
+ * @param _mesh The input mesh to be visualized in Polyscope.
+ *
+ * This function extracts vertex and face data from the input mesh and updates
+ * the Polyscope viewer with the current geometry.
+ */
 void rebuildPolyscopeMesh(TriMesh& _mesh)
 {
     // Convert mesh to arrays
@@ -23,6 +30,17 @@ void rebuildPolyscopeMesh(TriMesh& _mesh)
     polyscope::registerSurfaceMesh("Surface Mesh", vertices_matrix, faces_matrix);
 }
 
+/**
+ * @brief Opens a file explorer dialog to load a new mesh file.
+ *
+ * @param _mesh The mesh object to load data into from the selected file.
+ * @param _isFileDialogOpen A flag indicating whether the file dialog is currently open.
+ * @param _filename The name of the file selected by the user.
+ *
+ * This function presents a file dialog to the user, allowing them to select
+ * an `.obj` file. If a valid file is selected, the mesh is loaded and displayed
+ * in Polyscope.
+ */
 void openFileExplorer(TriMesh& _mesh, bool& _isFileDialogOpen, std::string& _filename)
 {
     const char* filters[] = { "*.obj" };
@@ -66,6 +84,17 @@ void openFileExplorer(TriMesh& _mesh, bool& _isFileDialogOpen, std::string& _fil
     }
 }
 
+/**
+ * @brief Simplifies the mesh by reducing its face count by a given percentage.
+ *
+ * @param _mesh The input mesh to be simplified.
+ * @param _meshHistory A stack storing previous mesh states for undo functionality.
+ * @param _simplifyPercentage The percentage by which to simplify the mesh.
+ *
+ * This function calculates the target number of faces based on the percentage
+ * and uses the QEMSimplifier to simplify the mesh. The previous state of the
+ * mesh is saved for undoing the operation.
+ */
 void simplifyMeshByPercentage(TriMesh& _mesh, std::stack<TriMesh>& _meshHistory, float _simplifyPercentage)
 {
     _meshHistory.push(_mesh); // save current state for undo
@@ -84,6 +113,15 @@ void simplifyMeshByPercentage(TriMesh& _mesh, std::stack<TriMesh>& _meshHistory,
     rebuildPolyscopeMesh(_mesh);
 }
 
+/**
+ * @brief Undoes the last mesh simplification.
+ *
+ * @param _mesh The mesh object to revert to the previous state.
+ * @param _meshHistory A stack storing the history of mesh states.
+ *
+ * This function pops the most recent mesh state from the history stack
+ * and restores it to undo the last simplification operation.
+ */
 void undoLastSimplification(TriMesh& _mesh, std::stack<TriMesh>& _meshHistory)
 {
     if (!_meshHistory.empty())
@@ -94,6 +132,16 @@ void undoLastSimplification(TriMesh& _mesh, std::stack<TriMesh>& _meshHistory)
     }
 }
 
+/**
+ * @brief Resets the mesh to its original state by reloading it from a file.
+ *
+ * @param _mesh The mesh object to reset.
+ * @param _meshHistory A stack storing the history of mesh states, which is cleared during reset.
+ * @param _filename The file from which to reload the mesh.
+ *
+ * This function clears the history stack and reloads the original mesh
+ * from the specified file, then updates the Polyscope display.
+ */
 void resetMesh(TriMesh& _mesh, std::stack<TriMesh>& _meshHistory, const std::string& _filename)
 {
     if (Parser::loadMesh(_filename, _mesh))
@@ -106,6 +154,14 @@ void resetMesh(TriMesh& _mesh, std::stack<TriMesh>& _meshHistory, const std::str
     }
 }
 
+/**
+ * @brief Displays statistics about the current mesh in the Polyscope GUI.
+ *
+ * @param _mesh The mesh object whose statistics are displayed.
+ *
+ * This function shows the number of vertices, edges, and faces in the mesh
+ * using ImGui within the Polyscope interface.
+ */
 void displayMeshStatistics(const TriMesh& _mesh)
 {
     ImGui::Text("Mesh Statistics");
@@ -114,6 +170,16 @@ void displayMeshStatistics(const TriMesh& _mesh)
     ImGui::Text("Faces: %zu", _mesh.n_faces());
 }
 
+/**
+ * @brief Main entry point of the program.
+ *
+ * This function initializes the Polyscope viewer, loads an initial mesh,
+ * and sets up the user interface for file selection, simplification, and
+ * visualization. It handles user interaction and dynamically updates the
+ * Polyscope display based on user actions.
+ *
+ * @return `EXIT_SUCCESS` if the program completes successfully; otherwise, `EXIT_FAILURE`.
+ */
 int main()
 {
     TriMesh mesh;

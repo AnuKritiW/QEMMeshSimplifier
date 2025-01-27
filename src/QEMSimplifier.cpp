@@ -4,10 +4,22 @@
 auto& vQuadric = QEMSimplifierUtils::getQuadricHandle();
 auto& vVersion = QEMSimplifierUtils::getVersionHandle();
 
+/**
+ * @brief Constructor for the QEMSimplifier class.
+ */
 QEMSimplifier::QEMSimplifier()
 {
 }
 
+/**
+ * @brief Computes the quadric error matrices for all vertices in the mesh.
+ *
+ * @param _mesh The input mesh whose vertex quadrics will be calculated.
+ *
+ * This function initializes quadric and version properties for each vertex,
+ * computes face quadrics in parallel, and accumulates the results into
+ * vertex quadrics in a single-threaded step.
+ */
 void QEMSimplifier::computeQuadrics(TriMesh& _mesh)
 {
     QEMSimplifierUtils::initializeProperty(_mesh, vQuadric, "v:quadric", QMatrix::Zero().eval());
@@ -24,6 +36,20 @@ void QEMSimplifier::computeQuadrics(TriMesh& _mesh)
     }
 }
 
+/**
+ * @brief Initializes a priority queue with edge collapse costs for the mesh.
+ *
+ * @param _mesh The input mesh whose edges will be evaluated.
+ * @param _priQ A priority queue of edges, sorted by collapse cost in ascending order.
+ *              - The priority queue is implemented as:
+ *                `std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>>`
+ *              - `EdgeInfo` represents the edge data, including collapse cost, optimal position, and versioning information.
+ *              - `std::greater<EdgeInfo>` ensures the smallest cost is at the top of the queue.
+ *
+ * This function calculates the collapse cost and optimal contraction
+ * position for each edge in the mesh, and stores the results in the
+ * priority queue.
+ */
 void QEMSimplifier::initializePriorityQueue(TriMesh& _mesh,
                                             std::priority_queue<EdgeInfo, std::vector<EdgeInfo>, std::greater<EdgeInfo>>& _priQ)
 {
@@ -57,10 +83,19 @@ void QEMSimplifier::initializePriorityQueue(TriMesh& _mesh,
     }
 }
 
-// Collapse an edge with a known new vertex position
-// * Merges quadrics
-// * Moves the final vertex
-// * Uses mesh.collapse(heh) from OpenMesh
+/**
+ * @brief Collapses an edge in the mesh to a new vertex position.
+ *
+ * @param _mesh The mesh on which the edge collapse is performed.
+ * @param _edge The edge to be collapsed.
+ * @param _newPos The new vertex position after the collapse.
+ * @param _vKeep The vertex that will remain after the collapse.
+ * @return True if the edge collapse was successful; otherwise, false.
+ *
+ * This function merges quadrics, updates vertex properties, moves
+ * the remaining vertex to the optimal position, and collapses the edge.
+ * It ensures that topological constraints are respected.
+ */
 bool QEMSimplifier::collapseEdge(TriMesh& _mesh, TriMesh::EdgeHandle _edge, const Eigen::Vector3d& _newPos, TriMesh::VertexHandle& _vKeep)
 {
     if (!_edge.is_valid()) return false;
@@ -95,6 +130,17 @@ bool QEMSimplifier::collapseEdge(TriMesh& _mesh, TriMesh::EdgeHandle _edge, cons
     return true;
 }
 
+/**
+ * @brief Recalculates the collapse costs for edges adjacent to a given vertex.
+ *
+ * @param _mesh The mesh containing the edges to be updated.
+ * @param _vKeep The vertex whose adjacent edges will be recalculated.
+ * @param _priQ The priority queue to store updated edge collapse costs.
+ *
+ * This function iterates through all edges adjacent to the given vertex,
+ * recalculates their collapse costs and optimal contraction positions,
+ * and updates the priority queue.
+ */
 void QEMSimplifier::recalculateEdgeCosts(TriMesh& _mesh,
                                          TriMesh::VertexHandle _vKeep,
                                          std::priority_queue<EdgeInfo,std::vector<EdgeInfo>, std::greater<EdgeInfo>>& _priQ)
@@ -149,6 +195,17 @@ void QEMSimplifier::recalculateEdgeCosts(TriMesh& _mesh,
     }
 }
 
+/**
+ * @brief Simplifies the mesh to a target number of faces.
+ *
+ * @param _mesh The input mesh to be simplified.
+ * @param _tgtNumFaces The target number of faces in the simplified mesh.
+ *
+ * This function computes the initial quadrics, initializes a priority
+ * queue with edge collapse costs, and iteratively collapses edges with
+ * the least cost until the target number of faces is reached. The mesh
+ * is cleaned up after simplification.
+ */
 void QEMSimplifier::simplifyMesh(TriMesh& _mesh, size_t _tgtNumFaces)
 {
     if (_mesh.n_faces() <= _tgtNumFaces) return;

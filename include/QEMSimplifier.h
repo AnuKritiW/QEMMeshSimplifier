@@ -27,9 +27,9 @@ private:
         Eigen::Vector3d optPos;
 
         int versionSum = 0;
-        bool operator>(const EdgeInfo& rhs) const
+        bool operator>(const EdgeInfo& _rhs) const
         {
-            return cost > rhs.cost;
+            return cost > _rhs.cost;
         }
     };
 
