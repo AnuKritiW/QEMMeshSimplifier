@@ -13,7 +13,6 @@ This project implements a mesh simplification algorithm based on Quadric Error M
 > - [Testing instructions](#testing-instructions)
 > - [UI](#ui)
 > - [Demo](#demo)
-> - [TODOs](#todos)
 
 ## Overview
 * Simplifies polygonal models using Quadric Error Metrics (QEM).
@@ -151,7 +150,11 @@ The project includes multiple test executables to validate its functionality:
 
 ## Demo
 
-*** link to demo video ***
+### Demo with narration found [here](https://youtu.be/AmDRhxQTcSE)
+
+### Demo preview below
+
+![Demo GIF](./References/demo2.gif)
 
 Here are some results of mesh simplification using this program:
 
