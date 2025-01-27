@@ -2,6 +2,8 @@
 #include <iostream>
 #include <Eigen/Dense>
 #include <stack>
+#include <unistd.h> // For getcwd
+#include <sys/stat.h> // For stat
 
 #include "parser.h"
 #include "polyscope/polyscope.h"
@@ -24,8 +26,30 @@ void rebuildPolyscopeMesh(TriMesh& _mesh)
 void openFileExplorer(TriMesh& _mesh, bool& _isFileDialogOpen, std::string& _filename)
 {
     const char* filters[] = { "*.obj" };
-    const char* homeDir = getenv("HOME");
-    if (!homeDir) homeDir = "";
+
+    // Get the current working directory
+    char cwd[PATH_MAX];
+    if (getcwd(cwd, sizeof(cwd)) == nullptr)
+    {
+        perror("getcwd error");
+        return;
+    }
+
+    std::string relativePath = std::string(cwd) + "/../object-files/";
+    const char* homeDir = relativePath.c_str();
+
+    // Check if the directory exists
+    struct stat info;
+    if (stat(homeDir, &info) != 0 || !(info.st_mode & S_IFDIR))
+    {
+        // If it does not exist or is not a directory, fall back to HOME
+        homeDir = getenv("HOME");
+    }
+
+    if (!homeDir)
+    {
+        homeDir = "";
+    }
 
     if (_isFileDialogOpen) {
         const char* filePath = tinyfd_openFileDialog(
