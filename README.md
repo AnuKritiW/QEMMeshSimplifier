@@ -268,6 +268,8 @@ a GPU. PloS one, 16(8), p.e0255832. Available from: https://journals.plos.org/pl
 Rossignac, J. and Borrel, P., 1993. Multi-resolution 3D approximations for rendering complex scenes.
 Modeling in computer graphics: methods and applications, 455-465. Available from: https://link.springer.com/chapter/10.1007/978-3-642-78114-8_29 [Accessed 28 October 2024].
 
+Vince, J., 2017. Mathematics for computer graphics. Fifth edition. London: Springer.
+
 ChatGPT was used for debugging and documentation.
 * When debugging, I sent my code snippets and the corresponding error message as a prompt.
 * For documentation, I sometimes used ChatGPT for better, more concise phrasing -- for the README, comments within the code, commit messages and PR descriptions. It was also used to generate Doxygen-styled comments above each function.
